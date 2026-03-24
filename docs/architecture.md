@@ -1,5 +1,12 @@
 # TAK Architecture
 
+![faster-whisper](https://img.shields.io/badge/ASR-faster--whisper-FF6F00?logo=openai&logoColor=white)
+![pynput](https://img.shields.io/badge/Input-pynput-4285F4)
+![PipeWire](https://img.shields.io/badge/Audio-PipeWire%20%2F%20ALSA-629FF4)
+![xdotool](https://img.shields.io/badge/Output-xdotool%20%2F%20xclip-E34F26)
+![CTranslate2](https://img.shields.io/badge/Inference-CTranslate2-76B900?logo=nvidia&logoColor=white)
+![NumPy](https://img.shields.io/badge/NumPy-Audio%20Processing-013243?logo=numpy&logoColor=white)
+
 Detailed software architecture documentation for TAK (Talk to Keyboard).
 
 ## Table of Contents

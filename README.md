@@ -1,5 +1,14 @@
 # TAK — Talk to Keyboard
 
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Linux%20%2F%20X11-FCC624?logo=linux&logoColor=black)
+![CUDA](https://img.shields.io/badge/CUDA-GPU%20Accelerated-76B900?logo=nvidia&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Speech](https://img.shields.io/badge/Speech--to--Text-Whisper-FF6F00?logo=openai&logoColor=white)
+![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline-blueviolet)
+![GitHub repo size](https://img.shields.io/github/repo-size/lchonkan/tak)
+![GitHub last commit](https://img.shields.io/github/last-commit/lchonkan/tak)
+
 Push-to-talk speech-to-text that types anywhere on Linux.
 
 Hold a key → speak → release → your words appear wherever you're typing.
