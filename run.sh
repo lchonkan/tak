@@ -20,4 +20,5 @@ if [[ "$(uname)" == "Linux" ]]; then
     done
 fi
 
-exec python3 "$SCRIPT_DIR/tak.py" "$@"
+export PYTHONPATH="$SCRIPT_DIR:${PYTHONPATH:-}"
+exec python3 -m tak "$@"

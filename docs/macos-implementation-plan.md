@@ -1,29 +1,29 @@
 # macOS Implementation Plan
 
-Development guide for adding macOS support to TAK. This work happens entirely in new files — **no changes to `tak_core.py` or `tak_linux.py` are needed**.
+Development guide for adding macOS support to TAK. This work happens entirely in new files — **no changes to `tak/app.py` or `tak/platforms/linux.py` are needed**.
 
 ## Current State
 
 Phase 1 (Linux refactoring) is complete. The codebase is modular:
 
 ```
-tak.py            → entry point, platform detection, backend wiring (macOS path ready)
-tak_core.py       → shared: TakApp, base classes, CLI, colors, constants
-tak_linux.py      → Linux: faster-whisper, PipeWire/ALSA, xdotool/xclip
+tak/__main__.py         → entry point, platform detection, backend wiring (macOS path ready)
+tak/app.py              → shared: TakApp, base classes, CLI, colors, constants
+tak/platforms/linux.py  → Linux: faster-whisper, PipeWire/ALSA, xdotool/xclip
 ```
 
-The entry point (`tak.py`) already contains the macOS branching logic — it imports `tak_macos` when `platform.system() == "Darwin"` and wires `MacAudioRecorder`, `MacTranscriber`, `type_text`, and `type_text_clipboard` into `TakApp`. **The only missing piece is the `tak_macos.py` file itself.**
+The entry point (`tak/__main__.py`) already contains the macOS branching logic — it imports `tak.platforms.macos` when `platform.system() == "Darwin"` and wires `MacAudioRecorder`, `MacTranscriber`, `type_text`, and `type_text_clipboard` into `TakApp`. **The only missing piece is the `tak/platforms/macos.py` file itself.**
 
 ## Deliverables
 
 | File | Action | Description |
 |------|--------|-------------|
-| `tak_macos.py` | **Create** | macOS backends (all new code) |
+| `tak/platforms/macos.py` | **Create** | macOS backends (all new code) |
 | `requirements-macos.txt` | **Create** | macOS Python dependencies |
 | `README.md` | **Update** | Add macOS installation section, update model table |
 | `docs/architecture.md` | **Update** | Add macOS backend to diagrams |
 
-No changes to: `tak.py`, `tak_core.py`, `tak_linux.py`, `run.sh`.
+No changes to: `tak/__main__.py`, `tak/app.py`, `tak/platforms/linux.py`, `run.sh`.
 
 ---
 
@@ -60,13 +60,13 @@ pip install mlx-whisper pynput sounddevice numpy
 
 ---
 
-## Step 1: Create `tak_macos.py`
+## Step 1: Create `tak/platforms/macos.py`
 
-This is the main implementation file. It must export the same interface as `tak_linux.py` so `tak.py` can use them interchangeably.
+This is the main implementation file. It must export the same interface as `tak/platforms/linux.py` so `tak/__main__.py` can use them interchangeably.
 
 ### Required exports
 
-The entry point (`tak.py:50-54`) expects these names:
+The entry point (`tak/__main__.py:50-54`) expects these names:
 
 ```python
 # Classes
@@ -97,7 +97,7 @@ from typing import Optional
 import numpy as np
 import sounddevice as sd
 
-from tak_core import (
+from tak.app import (
     BaseAudioRecorder, BaseTranscriber,
     WHISPER_RATE, CHANNELS, DTYPE, BLOCK_SIZE, KEY_MAP,
     status, announce, warn, error, _resample, C,
@@ -298,7 +298,7 @@ Add a macOS section after the existing Linux installation instructions. Keep the
 
 Add the macOS backend to the existing diagrams. Changes are additive — do not modify the Linux sections.
 
-1. **Module Structure diagram** — add `tak_macos.py` as a sibling to `tak_linux.py`
+1. **Module Structure diagram** — add `tak/platforms/macos.py` as a sibling to `tak/platforms/linux.py`
 2. **Component Diagram** — add macOS subgraph with Core Audio, mlx-whisper, AppleScript
 3. **Class Diagram** — add `MacAudioRecorder` and `MacTranscriber` extending the base classes
 
@@ -344,10 +344,10 @@ Add the macOS backend to the existing diagrams. Changes are additive — do not 
 - [ ] Spanish characters typed correctly
 - [ ] Works in: TextEdit, VS Code, browser text fields, Terminal
 
-**Cross-platform regression (run on Linux after adding tak_macos.py):**
+**Cross-platform regression (run on Linux after adding tak/platforms/macos.py):**
 
-- [ ] Linux still works (no import errors from tak_macos.py)
-- [ ] `import tak_macos` only happens when `platform.system() == "Darwin"`
+- [ ] Linux still works (no import errors from macos.py)
+- [ ] `from tak.platforms import macos` only happens when `platform.system() == "Darwin"`
 
 **Performance:**
 
@@ -364,13 +364,13 @@ Add the macOS backend to the existing diagrams. Changes are additive — do not 
 
 3. **Don't add `soundfile` as a dependency.** The `_write_wav()` helper uses only the standard library `wave` module.
 
-4. **Don't modify `tak_core.py`.** The core module is platform-agnostic. All macOS-specific logic goes in `tak_macos.py`.
+4. **Don't modify `tak/app.py`.** The core module is platform-agnostic. All macOS-specific logic goes in `tak/platforms/macos.py`.
 
-5. **Don't modify `tak_linux.py`.** macOS support is purely additive — new files only.
+5. **Don't modify `tak/platforms/linux.py`.** macOS support is purely additive — new files only.
 
-6. **Don't put platform-detection logic in `tak_macos.py`.** That lives in `tak.py` (the entry point). The macOS module assumes it's running on macOS.
+6. **Don't put platform-detection logic in `tak/platforms/macos.py`.** That lives in `tak/__main__.py` (the entry point). The macOS module assumes it's running on macOS.
 
-7. **Don't modify `KEY_MAP` in `tak_core.py`.** The full map lives in core. macOS removes unsupported keys via `adjust_key_map()` in `platform_setup()`.
+7. **Don't modify `KEY_MAP` in `tak/app.py`.** The full map lives in core. macOS removes unsupported keys via `adjust_key_map()` in `platform_setup()`.
 
 8. **Don't forget to call `self.normalize()` (not `self._normalize()`).** The normalize method lives on `BaseAudioRecorder` as a public static method.
 
