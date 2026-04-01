@@ -176,34 +176,40 @@ Keep PRs small and focused. One PR should do one thing. If you're making a large
 Understanding where code lives helps you put changes in the right place:
 
 ```
-tak/
-├── tak.py              # Entry point — platform detection, backend wiring
-├── tak_core.py         # Shared — TakApp, base classes, CLI, constants
-├── tak_linux.py        # Linux — faster-whisper, PipeWire/ALSA, xdotool
-├── tak_macos.py        # macOS — (planned) mlx-whisper, Core Audio, AppleScript
-├── run.sh              # Cross-platform launcher
+tak/                                # Project root
+├── run.sh                          # Cross-platform launcher
 ├── requirements-linux.txt
-├── requirements-macos.txt  # (planned)
+├── requirements-macos.txt          # (planned)
 ├── README.md
-├── CONTRIBUTING.md     # This file
+├── CONTRIBUTING.md                 # This file
+├── CLAUDE.md
 ├── LICENSE
-└── docs/
-    ├── architecture.md
-    └── macos-implementation-plan.md
+├── docs/
+│   ├── architecture.md
+│   └── macos-implementation-plan.md
+├── tak/                            # Python package
+│   ├── __init__.py                 # Package marker
+│   ├── __main__.py                 # Entry point (platform detection, backend wiring)
+│   ├── app.py                      # Shared core (TakApp, base classes, CLI, constants)
+│   ├── platforms/
+│   │   ├── linux.py                # Linux backend (faster-whisper, PipeWire/ALSA, xdotool)
+│   │   └── macos.py                # macOS backend (planned)
+│   └── ui/                         # UI layer (planned)
+└── .gitignore
 ```
 
 ### Where to put new code
 
 | Change | File |
 |--------|------|
-| Platform-agnostic logic (shared by all platforms) | `tak_core.py` |
-| Linux-specific feature or fix | `tak_linux.py` |
-| macOS-specific feature or fix | `tak_macos.py` |
-| New platform backend | New `tak_<platform>.py` file |
-| CLI argument changes | `tak_core.py` (`parse_args()`) |
-| Entry point / platform wiring | `tak.py` |
+| Platform-agnostic logic (shared by all platforms) | `tak/app.py` |
+| Linux-specific feature or fix | `tak/platforms/linux.py` |
+| macOS-specific feature or fix | `tak/platforms/macos.py` |
+| New platform backend | New `tak/platforms/<platform>.py` file |
+| CLI argument changes | `tak/app.py` (`parse_args()`) |
+| Entry point / platform wiring | `tak/__main__.py` |
 
-**Design rule:** No `if IS_MACOS` / `if IS_LINUX` inside `tak_core.py`. Platform branching only happens in `tak.py`.
+**Design rule:** No `if IS_MACOS` / `if IS_LINUX` inside `tak/app.py`. Platform branching only happens in `tak/__main__.py`.
 
 ## Development Setup
 
@@ -224,8 +230,8 @@ See [docs/macos-implementation-plan.md](docs/macos-implementation-plan.md) for s
 
 ```bash
 ./run.sh                    # via launcher
-python tak.py               # directly (after activating conda env)
-python tak.py --cpu         # CPU-only mode (no GPU needed)
+python -m tak               # directly (after activating conda env)
+python -m tak --cpu         # CPU-only mode (no GPU needed)
 ```
 
 ## Code Style
@@ -240,7 +246,6 @@ python tak.py --cpu         # CPU-only mode (no GPU needed)
 
 - Open an [issue](https://github.com/lchonkan/tak/issues) for bugs or feature requests
 - Check `docs/` for architecture details and implementation plans
-- Look at `Migrationguide.md` for the overall cross-platform migration context
 
 ## License
 

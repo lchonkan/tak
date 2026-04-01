@@ -111,7 +111,7 @@ You can also run directly with Python (after activating the conda env):
 
 ```bash
 conda activate tak
-python tak.py --key ctrl_r --model medium
+python -m tak --key ctrl_r --model medium
 ```
 
 ### Available trigger keys
@@ -149,19 +149,19 @@ TAK uses a modular architecture with dependency injection. The core application 
 
 ```mermaid
 graph TD
-    subgraph "tak.py (Entry Point)"
-        EP[Platform Detection] --> |Linux| LINUX[tak_linux]
-        EP --> |macOS| MACOS[tak_macos]
+    subgraph "tak/__main__.py (Entry Point)"
+        EP[Platform Detection] --> |Linux| LINUX[platforms.linux]
+        EP --> |macOS| MACOS[platforms.macos]
     end
 
-    subgraph "tak_core.py (Shared)"
+    subgraph "tak/app.py (Shared Core)"
         APP[TakApp]
         BASE_REC[BaseAudioRecorder]
         BASE_TR[BaseTranscriber]
         PARSE[parse_args]
     end
 
-    subgraph "tak_linux.py (Linux Backend)"
+    subgraph "tak/platforms/linux.py"
         LREC[LinuxAudioRecorder<br/>PipeWire / ALSA]
         LTR[LinuxTranscriber<br/>faster-whisper + CUDA]
         LTI[type_text<br/>xdotool / xclip]
@@ -180,16 +180,24 @@ For detailed architecture diagrams (class diagrams, sequence diagrams, state mac
 ### Project structure
 
 ```
-tak/
-├── tak.py                  # Entry point — detects platform, wires backends, runs app
-├── tak_core.py             # Shared: TakApp, CLI parser, colors, constants, base classes
-├── tak_linux.py            # Linux: LinuxTranscriber, LinuxAudioRecorder, xdotool/xclip
-├── run.sh                  # Cross-platform launcher (activates conda env + CUDA paths)
-├── requirements-linux.txt  # Linux Python dependencies
-├── README.md               # This file
+tak/                                # Project root
+├── run.sh                          # Cross-platform launcher
+├── requirements-linux.txt          # Linux Python dependencies
+├── README.md                       # This file
+├── CONTRIBUTING.md                 # Git Flow and contributor guide
+├── CLAUDE.md                       # Instructions for Claude Code
 ├── LICENSE
 ├── docs/
-│   └── architecture.md     # Detailed architecture diagrams
+│   ├── architecture.md             # Detailed architecture diagrams
+│   └── macos-implementation-plan.md
+├── tak/                            # Python package
+│   ├── __init__.py                 # Package marker
+│   ├── __main__.py                 # Entry point (platform detection, backend wiring)
+│   ├── app.py                      # Shared core (TakApp, base classes, CLI, constants)
+│   ├── platforms/
+│   │   ├── linux.py                # Linux backend (faster-whisper, PipeWire/ALSA, xdotool)
+│   │   └── macos.py                # macOS backend (planned)
+│   └── ui/                         # UI layer (planned)
 └── .gitignore
 ```
 

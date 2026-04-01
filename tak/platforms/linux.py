@@ -13,7 +13,7 @@ from typing import Optional
 import numpy as np
 import sounddevice as sd
 
-from tak_core import (
+from tak.app import (
     BaseAudioRecorder, BaseTranscriber,
     WHISPER_RATE, CHANNELS, DTYPE, BLOCK_SIZE,
     status, announce, warn, error, _resample, C,
