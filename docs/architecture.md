@@ -12,6 +12,7 @@ Detailed software architecture documentation for TAK (Talk to Keyboard).
 ## Table of Contents
 
 - [System Overview](#system-overview)
+- [Module Structure](#module-structure)
 - [Component Diagram](#component-diagram)
 - [Class Diagram](#class-diagram)
 - [Push-to-Talk Sequence](#push-to-talk-sequence)
@@ -25,7 +26,7 @@ Detailed software architecture documentation for TAK (Talk to Keyboard).
 
 ## System Overview
 
-TAK is a single-process, multi-threaded Linux application that captures speech via push-to-talk and types the transcribed text into any focused window. All processing happens locally — no network calls are made after the initial model download.
+TAK is a single-process, multi-threaded application that captures speech via push-to-talk and types the transcribed text into any focused window. It uses a modular architecture with platform-agnostic core logic and pluggable platform backends. All processing happens locally — no network calls are made after the initial model download.
 
 ```mermaid
 graph LR
@@ -41,7 +42,7 @@ graph LR
 
     TAK -->|simulated keystrokes| FW[Focused Window]
 
-    subgraph External Dependencies
+    subgraph "Linux Dependencies"
         PW[PipeWire / ALSA]
         FW_MODEL[faster-whisper]
         XDO[xdotool / xclip]
@@ -54,33 +55,80 @@ graph LR
 
 ---
 
-## Component Diagram
+## Module Structure
 
-A detailed view of all components, their responsibilities, and how they interconnect.
+TAK is split into three modules with a clear dependency flow. Platform branching happens only in the entry point — the core module has no platform-specific imports.
 
 ```mermaid
 graph TD
-    subgraph Input Layer
+    subgraph "tak.py — Entry Point"
+        EP[Platform detection<br/>Backend wiring<br/>Dependency injection]
+    end
+
+    subgraph "tak_core.py — Shared Core"
+        TAKAPP[TakApp]
+        BASE[BaseAudioRecorder<br/>BaseTranscriber]
+        UTIL[parse_args · colors · constants<br/>KEY_MAP · _resample · normalize]
+    end
+
+    subgraph "tak_linux.py — Linux Backend"
+        CUDA_INIT[ensure_cuda_libs]
+        LINUX_TR[LinuxTranscriber]
+        LINUX_REC[LinuxAudioRecorder]
+        LINUX_TI[type_text · type_text_clipboard]
+        LINUX_IF[platform_setup · get_default_model<br/>get_platform_label]
+    end
+
+    EP -->|imports| TAKAPP
+    EP -->|imports on Linux| LINUX_IF
+    LINUX_TR -->|extends| BASE
+    LINUX_REC -->|extends| BASE
+    TAKAPP -->|uses injected| LINUX_TR
+    TAKAPP -->|uses injected| LINUX_REC
+    TAKAPP -->|uses injected| LINUX_TI
+```
+
+### Design Principles
+
+- **No `if IS_MACOS` inside core.** Platform branching happens only in `tak.py` (entry point).
+- **Constructor injection.** `TakApp` receives backends as arguments — it never imports a platform module.
+- **Each platform file is self-contained.** Deleting `tak_linux.py` on a Mac causes no errors.
+- **Shared utilities in core.** Resampling, normalization, colors, constants, CLI parsing — all platform-agnostic.
+
+---
+
+## Component Diagram
+
+A detailed view of all components, their responsibilities, and how they interconnect. Components are organized by module.
+
+```mermaid
+graph TD
+    subgraph "tak_core.py — Platform-Agnostic"
         PYNPUT[pynput<br/>Keyboard Listener]
-        PWREC[pw-record<br/>PipeWire Audio]
-        SDEV[sounddevice<br/>ALSA Fallback]
-    end
-
-    subgraph Core Application
         TAKAPP[TakApp<br/>Main Controller]
-        AREC[AudioRecorder<br/>Recording Manager]
-        TRANS[Transcriber<br/>Speech-to-Text]
+        BASE_REC[BaseAudioRecorder<br/>ABC]
+        BASE_TR[BaseTranscriber<br/>ABC]
     end
 
-    subgraph Output Layer
-        XDOTOOL[xdotool<br/>Keystroke Simulation]
-        XCLIP[xclip<br/>Clipboard Paste]
-    end
+    subgraph "tak_linux.py — Linux Backend"
+        subgraph Input Layer
+            PWREC[pw-record<br/>PipeWire Audio]
+            SDEV[sounddevice<br/>ALSA Fallback]
+        end
 
-    subgraph ML Engine
-        WHISPER[faster-whisper<br/>Whisper Model]
-        CT2[CTranslate2<br/>Inference Runtime]
-        CUDA[CUDA / cuBLAS / cuDNN<br/>GPU Acceleration]
+        AREC[LinuxAudioRecorder]
+        TRANS[LinuxTranscriber]
+
+        subgraph Output Layer
+            XDOTOOL[xdotool<br/>Keystroke Simulation]
+            XCLIP[xclip<br/>Clipboard Paste]
+        end
+
+        subgraph ML Engine
+            WHISPER[faster-whisper<br/>Whisper Model]
+            CT2[CTranslate2<br/>Inference Runtime]
+            CUDA[CUDA / cuBLAS / cuDNN<br/>GPU Acceleration]
+        end
     end
 
     PYNPUT -->|key events| TAKAPP
@@ -88,6 +136,9 @@ graph TD
     TAKAPP -->|audio data| TRANS
     TAKAPP -->|text| XDOTOOL
     TAKAPP -->|text| XCLIP
+
+    AREC -->|implements| BASE_REC
+    TRANS -->|implements| BASE_TR
 
     AREC -->|primary| PWREC
     AREC -->|fallback| SDEV
@@ -101,15 +152,18 @@ graph TD
 
 ## Class Diagram
 
-The three core classes and their relationships.
+The class hierarchy uses abstract base classes in `tak_core.py` with concrete implementations in platform modules. `TakApp` receives its dependencies via constructor injection.
 
 ```mermaid
 classDiagram
     class TakApp {
         -trigger_key: Key
+        -recorder: BaseAudioRecorder
+        -transcriber: BaseTranscriber
+        -_type_fn: Callable
+        -_clipboard_fn: Callable
         -use_clipboard: bool
-        -recorder: AudioRecorder
-        -transcriber: Transcriber
+        -_platform_label: str
         -_pressed: bool
         -_lock: threading.Lock
         -_processing: bool
@@ -119,7 +173,19 @@ classDiagram
         -_process(audio: ndarray)
     }
 
-    class AudioRecorder {
+    class BaseAudioRecorder {
+        <<abstract>>
+        +start()* void
+        +stop()* ndarray | None
+        +normalize(audio: ndarray)$ ndarray
+    }
+
+    class BaseTranscriber {
+        <<abstract>>
+        +transcribe(audio: ndarray)* str
+    }
+
+    class LinuxAudioRecorder {
         -_device: int | None
         -_recording: bool
         -_pw_proc: Popen | None
@@ -135,20 +201,29 @@ classDiagram
         -_stop_pw() ndarray | None
         -_stop_sd() ndarray | None
         -_sd_callback(indata, frames, time_info, status)
-        -_normalize(audio: ndarray)$ ndarray
     }
 
-    class Transcriber {
+    class LinuxTranscriber {
         -model: WhisperModel
         +__init__(model_size, device, compute_type)
         +transcribe(audio: ndarray) str
     }
 
-    TakApp --> AudioRecorder : records audio
-    TakApp --> Transcriber : transcribes audio
-    TakApp ..> type_text : calls
-    TakApp ..> type_text_clipboard : calls
+    BaseAudioRecorder <|-- LinuxAudioRecorder : extends
+    BaseTranscriber <|-- LinuxTranscriber : extends
+    TakApp --> BaseAudioRecorder : recorder (injected)
+    TakApp --> BaseTranscriber : transcriber (injected)
+    TakApp ..> type_fn : calls (injected)
+    TakApp ..> clipboard_fn : calls (injected)
 ```
+
+### Module ownership
+
+| Class / Function | Module |
+|---|---|
+| `TakApp`, `BaseAudioRecorder`, `BaseTranscriber`, `parse_args()` | `tak_core.py` |
+| `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()` | `tak_linux.py` |
+| Platform detection, backend wiring | `tak.py` |
 
 ---
 
@@ -160,11 +235,11 @@ The complete lifecycle of a single push-to-talk interaction.
 sequenceDiagram
     actor User
     participant KL as Key Listener<br/>(pynput)
-    participant App as TakApp
-    participant Rec as AudioRecorder
+    participant App as TakApp<br/>(tak_core)
+    participant Rec as LinuxAudioRecorder<br/>(tak_linux)
     participant PW as pw-record / ALSA
     participant Mic as Microphone
-    participant Trans as Transcriber
+    participant Trans as LinuxTranscriber<br/>(tak_linux)
     participant Whisper as faster-whisper
     participant XDO as xdotool
 
@@ -286,7 +361,7 @@ graph TD
 
 ## Text Injection Flow
 
-How transcribed text gets typed into the target application.
+How transcribed text gets typed into the target application (Linux shown — uses xdotool/xclip from `tak_linux.py`).
 
 ```mermaid
 graph TD
@@ -329,15 +404,15 @@ graph TD
     subgraph Listener Thread["Listener Thread (pynput)"]
         PRESS[on_press callback]
         RELEASE[on_release callback]
-        PRESS -->|start recording| REC[AudioRecorder.start]
-        RELEASE -->|stop recording| STOP[AudioRecorder.stop]
+        PRESS -->|start recording| REC[recorder.start]
+        RELEASE -->|stop recording| STOP[recorder.stop]
     end
 
     subgraph Worker Thread["Worker Thread (per transcription)"]
         STOP -->|spawn daemon thread| PROCESS[_process]
         PROCESS --> LOCK1[Acquire lock<br/>set _processing = True]
-        LOCK1 --> TRANSCRIBE[Transcriber.transcribe]
-        TRANSCRIBE --> TYPE[type_text / type_text_clipboard]
+        LOCK1 --> TRANSCRIBE[transcriber.transcribe]
+        TRANSCRIBE --> TYPE[_type_fn / _clipboard_fn]
         TYPE --> LOCK2[Release lock<br/>set _processing = False]
     end
 
@@ -359,38 +434,41 @@ The threading lock (`_lock`) ensures that:
 
 ## CUDA Initialization
 
-How TAK pre-loads NVIDIA libraries before the Whisper model is initialized.
+How TAK pre-loads NVIDIA libraries before the Whisper model is initialized. This runs on Linux only, triggered by `tak_linux.platform_setup()` during startup.
 
 ```mermaid
 sequenceDiagram
-    participant TAK as tak.py (module load)
+    participant EP as tak.py (entry point)
+    participant LINUX as tak_linux.py
     participant CTYPES as ctypes
     participant FS as Filesystem
     participant CUDA as CUDA Libraries
     participant CT2 as CTranslate2
     participant WHISPER as faster-whisper
 
-    TAK->>TAK: _ensure_cuda_libs()
-    TAK->>FS: Find site-packages path
+    EP->>LINUX: platform_setup()
+    LINUX->>LINUX: ensure_cuda_libs()
+    LINUX->>FS: Find site-packages path
 
-    TAK->>FS: Check libcublasLt.so.12
-    FS-->>TAK: exists
-    TAK->>CTYPES: CDLL(libcublasLt.so.12, RTLD_GLOBAL)
+    LINUX->>FS: Check libcublasLt.so.12
+    FS-->>LINUX: exists
+    LINUX->>CTYPES: CDLL(libcublasLt.so.12, RTLD_GLOBAL)
     CTYPES->>CUDA: Load into process address space
 
-    TAK->>FS: Check libcublas.so.12
-    FS-->>TAK: exists
-    TAK->>CTYPES: CDLL(libcublas.so.12, RTLD_GLOBAL)
+    LINUX->>FS: Check libcublas.so.12
+    FS-->>LINUX: exists
+    LINUX->>CTYPES: CDLL(libcublas.so.12, RTLD_GLOBAL)
     CTYPES->>CUDA: Load into process address space
 
-    TAK->>FS: Check libcudnn.so.9
-    FS-->>TAK: exists
-    TAK->>CTYPES: CDLL(libcudnn.so.9, RTLD_GLOBAL)
+    LINUX->>FS: Check libcudnn.so.9
+    FS-->>LINUX: exists
+    LINUX->>CTYPES: CDLL(libcudnn.so.9, RTLD_GLOBAL)
     CTYPES->>CUDA: Load into process address space
 
-    Note over TAK,CUDA: Libraries now in process memory<br/>LD_LIBRARY_PATH is too late at this point
+    Note over LINUX,CUDA: Libraries now in process memory<br/>LD_LIBRARY_PATH is too late at this point
 
-    TAK->>WHISPER: WhisperModel(device="cuda")
+    EP->>LINUX: LinuxTranscriber(model_size, device, compute_type)
+    LINUX->>WHISPER: WhisperModel(device="cuda")
     WHISPER->>CT2: Initialize engine
     CT2->>CUDA: Find cublas/cudnn (already loaded)
     CT2-->>WHISPER: Model ready
