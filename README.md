@@ -18,10 +18,10 @@ Works in any application — terminals, browsers, editors, chat apps, anything w
 
 - **Push-to-talk** — microphone is only open while you hold the key (no always-on listening)
 - **System-wide** — types into whatever window/field currently has focus
-- **Cross-platform** — Linux (X11) and macOS (planned)
+- **Cross-platform** — Linux (X11) and macOS (Apple Silicon)
 - **Bilingual** — auto-detects English and Spanish
-- **Local & private** — runs entirely on your machine via [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (no cloud APIs)
-- **GPU-accelerated** — uses CUDA on your NVIDIA GPU for fast transcription (Linux)
+- **Local & private** — runs entirely on your machine via [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Linux) or [mlx-whisper](https://github.com/ml-explore/mlx-examples) (macOS) — no cloud APIs
+- **GPU-accelerated** — uses CUDA on NVIDIA GPUs (Linux) or Metal on Apple Silicon (macOS)
 - **Auto-normalization** — automatically boosts quiet microphone levels
 - **Voice activity detection** — filters out silence and background noise
 - **Modular architecture** — platform-agnostic core with pluggable backends
@@ -35,6 +35,14 @@ Works in any application — terminals, browsers, editors, chat apps, anything w
 - NVIDIA GPU with CUDA (or use `--cpu` for CPU-only)
 - [Conda](https://docs.anaconda.com/miniconda/) (Miniconda or Anaconda)
 - System packages: `xdotool`, `xclip`, `libportaudio2`
+
+### macOS
+
+- macOS 13+ (Ventura or later)
+- Apple Silicon (M1/M2/M3/M4) recommended — Metal GPU acceleration via MLX
+- Intel Macs work but run CPU-only inference (significantly slower)
+- [Homebrew](https://brew.sh/)
+- [Conda](https://docs.anaconda.com/miniconda/) (Miniconda or Anaconda)
 
 ## Installation
 
@@ -80,6 +88,45 @@ sudo usermod -aG input $USER
 # Log out and back in for the change to take effect
 ```
 
+### macOS
+
+#### 1. Install system dependencies
+
+```bash
+brew install portaudio
+```
+
+#### 2. Create the Conda environment
+
+```bash
+conda create -n tak python=3.11 -y
+conda activate tak
+```
+
+#### 3. Install Python dependencies
+
+```bash
+pip install -r requirements-macos.txt
+```
+
+Or install manually:
+
+```bash
+pip install mlx-whisper pynput sounddevice numpy
+```
+
+#### 4. Accessibility permission
+
+`pynput` needs Accessibility permission to detect global key events:
+
+```
+System Settings → Privacy & Security → Accessibility → add your terminal app
+```
+
+TAK checks for this on startup and will show a clear error if it's missing.
+
+> **Tip:** MacBook keyboards don't have Right Ctrl. Use `--key caps_lock` instead.
+
 ## Quick Start
 
 ```bash
@@ -123,13 +170,14 @@ scroll_lock, pause, insert, f1–f12, caps_lock
 
 ### Model sizes
 
-| Model      | VRAM   | Speed   | Accuracy |
-|------------|--------|---------|----------|
-| `tiny`     | ~1 GB  | Fastest | Basic    |
-| `base`     | ~1 GB  | Fast    | Good     |
-| `small`    | ~2 GB  | Moderate| Better   |
-| `medium`   | ~5 GB  | Slower  | Great    |
-| `large-v3` | ~6 GB  | Slowest | Best     |
+| Model      | VRAM/RAM | Speed   | Accuracy | Notes          |
+|------------|----------|---------|----------|----------------|
+| `tiny`     | ~1 GB   | Fastest | Basic    |                |
+| `base`     | ~1 GB   | Fast    | Good     |                |
+| `small`    | ~2 GB   | Moderate| Better   |                |
+| `medium`   | ~5 GB   | Slower  | Great    | Linux default  |
+| `large-v3` | ~6 GB   | Slowest | Best     |                |
+| `turbo`    | ~2 GB   | Fast    | Great    | macOS default  |
 
 Models are downloaded on first use and cached in `~/.cache/huggingface/hub/`.
 
@@ -138,8 +186,8 @@ Models are downloaded on first use and cached in `~/.cache/huggingface/hub/`.
 TAK has three main stages that run in a loop:
 
 1. **Key listener** — `pynput` monitors for the trigger key. On press, recording starts; on release, recording stops.
-2. **Audio recording** — On Linux, captures audio via PipeWire (`pw-record`) for proper device routing, or falls back to ALSA via `sounddevice`. Audio is recorded at 16 kHz mono (Whisper's native format). Quiet audio is auto-normalized so Whisper can hear it.
-3. **Transcription & typing** — `faster-whisper` transcribes the audio locally using your GPU (or CPU). The detected text is then typed into the focused window using platform-specific text injection (xdotool on Linux).
+2. **Audio recording** — On Linux, captures audio via PipeWire (`pw-record`) or falls back to ALSA via `sounddevice`. On macOS, captures audio via Core Audio through `sounddevice`. Audio is resampled to 16 kHz mono (Whisper's native format). Quiet audio is auto-normalized so Whisper can hear it.
+3. **Transcription & typing** — On Linux, `faster-whisper` transcribes the audio using CUDA on your NVIDIA GPU. On macOS, `mlx-whisper` transcribes using Metal on Apple Silicon. The detected text is typed into the focused window using platform-specific text injection (xdotool on Linux, AppleScript on macOS).
 
 Transcription runs in a background thread so the key listener stays responsive. If you start a new recording while the previous one is still being transcribed, it waits until the current transcription finishes.
 
@@ -183,6 +231,7 @@ For detailed architecture diagrams (class diagrams, sequence diagrams, state mac
 tak/                                # Project root
 ├── run.sh                          # Cross-platform launcher
 ├── requirements-linux.txt          # Linux Python dependencies
+├── requirements-macos.txt          # macOS Python dependencies
 ├── README.md                       # This file
 ├── CONTRIBUTING.md                 # Git Flow and contributor guide
 ├── CLAUDE.md                       # Instructions for Claude Code
@@ -196,7 +245,7 @@ tak/                                # Project root
 │   ├── app.py                      # Shared core (TakApp, base classes, CLI, constants)
 │   ├── platforms/
 │   │   ├── linux.py                # Linux backend (faster-whisper, PipeWire/ALSA, xdotool)
-│   │   └── macos.py                # macOS backend (planned)
+│   │   └── macos.py                # macOS backend (mlx-whisper, Core Audio, AppleScript)
 │   └── ui/                         # UI layer (planned)
 └── .gitignore
 ```
@@ -232,6 +281,32 @@ Then specify the device index:
 
 ```bash
 ./run.sh --device <index>
+```
+
+### macOS: Accessibility permission not granted
+
+TAK needs Accessibility permission for `pynput` to detect global key events. Go to:
+
+```
+System Settings → Privacy & Security → Accessibility
+```
+
+Add your terminal app (Terminal.app, iTerm2, etc.) to the list.
+
+### macOS: Microphone permission
+
+macOS will prompt for microphone access on the first recording attempt. Click "Allow" when prompted. If you accidentally denied it, re-enable in:
+
+```
+System Settings → Privacy & Security → Microphone
+```
+
+### macOS: No Right Ctrl on MacBook keyboards
+
+MacBook keyboards don't have a Right Ctrl key. Use Caps Lock instead:
+
+```bash
+./run.sh --key caps_lock
 ```
 
 ### PipeWire not available
