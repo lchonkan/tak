@@ -179,13 +179,14 @@ Understanding where code lives helps you put changes in the right place:
 tak/                                # Project root
 ├── run.sh                          # Cross-platform launcher
 ├── requirements-linux.txt
-├── requirements-macos.txt          # (planned)
+├── requirements-macos.txt
 ├── README.md
 ├── CONTRIBUTING.md                 # This file
 ├── CLAUDE.md
 ├── LICENSE
 ├── docs/
 │   ├── architecture.md
+│   ├── platform-architecture.md
 │   └── macos-implementation-plan.md
 ├── tak/                            # Python package
 │   ├── __init__.py                 # Package marker
@@ -193,7 +194,7 @@ tak/                                # Project root
 │   ├── app.py                      # Shared core (TakApp, base classes, CLI, constants)
 │   ├── platforms/
 │   │   ├── linux.py                # Linux backend (faster-whisper, PipeWire/ALSA, xdotool)
-│   │   └── macos.py                # macOS backend (planned)
+│   │   └── macos.py                # macOS backend (mlx-whisper, Core Audio, AppleScript)
 │   └── ui/                         # UI layer (planned)
 └── .gitignore
 ```
@@ -222,9 +223,16 @@ conda activate tak
 pip install -r requirements-linux.txt
 ```
 
-### macOS (planned)
+### macOS
 
-See [docs/macos-implementation-plan.md](docs/macos-implementation-plan.md) for setup instructions.
+```bash
+brew install portaudio
+conda create -n tak python=3.11 -y
+conda activate tak
+pip install -r requirements-macos.txt
+```
+
+Then grant Accessibility permission: System Settings → Privacy & Security → Accessibility → add your terminal app.
 
 ### Running
 

@@ -215,12 +215,24 @@ graph TD
         LTI[type_text<br/>xdotool / xclip]
     end
 
+    subgraph "tak/platforms/macos.py"
+        MREC[MacAudioRecorder<br/>Core Audio]
+        MTR[MacTranscriber<br/>mlx-whisper + Metal]
+        MTI[type_text<br/>AppleScript / pbcopy]
+    end
+
     LINUX --> |injects backends| APP
+    MACOS --> |injects backends| APP
     LREC --> |extends| BASE_REC
     LTR --> |extends| BASE_TR
+    MREC --> |extends| BASE_REC
+    MTR --> |extends| BASE_TR
     APP --> |uses| LREC
     APP --> |uses| LTR
     APP --> |uses| LTI
+    APP --> |uses| MREC
+    APP --> |uses| MTR
+    APP --> |uses| MTI
 ```
 
 For detailed architecture diagrams (class diagrams, sequence diagrams, state machines, threading model, audio pipeline, and more), see **[docs/architecture.md](docs/architecture.md)**.
@@ -238,7 +250,8 @@ tak/                                # Project root
 ├── LICENSE
 ├── docs/
 │   ├── architecture.md             # Detailed architecture diagrams
-│   └── macos-implementation-plan.md
+│   ├── platform-architecture.md    # Cross-platform stack comparison
+│   └── macos-implementation-plan.md # macOS implementation spec (completed)
 ├── tak/                            # Python package
 │   ├── __init__.py                 # Package marker
 │   ├── __main__.py                 # Entry point (platform detection, backend wiring)

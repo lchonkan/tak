@@ -213,7 +213,7 @@ graph TD
 
 ## Class Diagram
 
-The class hierarchy uses abstract base classes in `tak_core.py` with concrete implementations in platform modules. `TakApp` receives its dependencies via constructor injection.
+The class hierarchy uses abstract base classes in `tak/app.py` with concrete implementations in platform modules. `TakApp` receives its dependencies via constructor injection.
 
 ```mermaid
 classDiagram
@@ -311,7 +311,7 @@ classDiagram
 
 ## Push-to-Talk Sequence
 
-The complete lifecycle of a single push-to-talk interaction.
+The complete lifecycle of a single push-to-talk interaction. The Linux backend is shown below; macOS follows the same pattern with `MacAudioRecorder` → Core Audio and `MacTranscriber` → mlx-whisper → AppleScript.
 
 ```mermaid
 sequenceDiagram
@@ -401,11 +401,14 @@ How audio flows from microphone to Whisper-ready format.
 ```mermaid
 graph TD
     subgraph Recording
-        MIC[Microphone Input] --> ROUTE{PipeWire<br/>available?}
+        MIC[Microphone Input] --> PLAT{Platform?}
+        PLAT -->|Linux| ROUTE{PipeWire<br/>available?}
+        PLAT -->|macOS| COREAUDIO[sounddevice<br/>Core Audio<br/>native rate]
         ROUTE -->|Yes| PW[pw-record<br/>16kHz mono s16]
-        ROUTE -->|No| SD[sounddevice<br/>native rate]
+        ROUTE -->|No| SD[sounddevice<br/>ALSA<br/>native rate]
         PW --> WAV[WAV file on disk]
         SD --> CHUNKS[In-memory chunks]
+        COREAUDIO --> CHUNKS
     end
 
     subgraph Processing
@@ -429,13 +432,21 @@ graph TD
         BOOST --> OUT
     end
 
-    OUT[16kHz float32 mono<br/>normalized audio] --> WHISPER[faster-whisper]
+    OUT[16kHz float32 mono<br/>normalized audio] --> ENGINE{Platform?}
 
-    subgraph Transcription
-        WHISPER --> VAD[Voice Activity Detection<br/>threshold: 0.3]
+    subgraph "Linux Transcription"
+        ENGINE -->|Linux| FW[faster-whisper]
+        FW --> VAD[Voice Activity Detection<br/>threshold: 0.3]
         VAD --> LANG[Language Detection<br/>English / Spanish]
         LANG --> BEAM[Beam Search<br/>beam_size: 5]
-        BEAM --> TEXT[Transcribed Text]
+        BEAM --> TEXT1[Transcribed Text]
+    end
+
+    subgraph "macOS Transcription"
+        ENGINE -->|macOS| TMPWAV[Write temp WAV]
+        TMPWAV --> MLX[mlx-whisper]
+        MLX --> MLANG[Language Detection<br/>English / Spanish]
+        MLANG --> TEXT2[Transcribed Text]
     end
 ```
 
@@ -443,28 +454,45 @@ graph TD
 
 ## Text Injection Flow
 
-How transcribed text gets typed into the target application (Linux shown — uses xdotool/xclip from `tak_linux.py`).
+How transcribed text gets typed into the target application. Each platform uses its own tools for keystroke simulation and clipboard paste.
 
 ```mermaid
 graph TD
     TEXT[Transcribed Text] --> EMPTY{Text is<br/>empty?}
     EMPTY -->|Yes| SKIP[Skip - no speech detected]
-    EMPTY -->|No| MODE{Clipboard<br/>mode?}
+    EMPTY -->|No| PLAT{Platform?}
 
-    MODE -->|No| XDOTOOL[xdotool type<br/>--clearmodifiers<br/>--delay 12ms]
-    MODE -->|Yes| CLIP_FLOW
+    PLAT -->|Linux| L_MODE{Clipboard<br/>mode?}
+    PLAT -->|macOS| M_MODE{Clipboard<br/>mode?}
 
-    subgraph CLIP_FLOW [Clipboard Paste Flow]
-        SAVE[Save current clipboard<br/>via xclip -o]
-        SET[Set clipboard to text<br/>via xclip]
-        PASTE[Simulate Ctrl+V<br/>via xdotool key]
-        WAIT[Wait 100ms]
-        RESTORE[Restore original clipboard]
-        SAVE --> SET --> PASTE --> WAIT --> RESTORE
+    L_MODE -->|No| XDOTOOL[xdotool type<br/>--clearmodifiers<br/>--delay 12ms]
+    L_MODE -->|Yes| L_CLIP
+
+    M_MODE -->|No| APPLESCRIPT[osascript<br/>AppleScript keystroke]
+    M_MODE -->|Yes| M_CLIP
+
+    subgraph L_CLIP ["Linux Clipboard Paste"]
+        LC1[xclip -o · save clipboard]
+        LC2[xclip · set text]
+        LC3[xdotool key ctrl+v]
+        LC4[sleep 100ms]
+        LC5[xclip · restore clipboard]
+        LC1 --> LC2 --> LC3 --> LC4 --> LC5
+    end
+
+    subgraph M_CLIP ["macOS Clipboard Paste"]
+        MC1[pbpaste · save clipboard]
+        MC2[pbcopy · set text]
+        MC3[osascript Cmd+V]
+        MC4[sleep 100ms]
+        MC5[pbcopy · restore clipboard]
+        MC1 --> MC2 --> MC3 --> MC4 --> MC5
     end
 
     XDOTOOL --> RESULT{Success?}
-    CLIP_FLOW --> RESULT
+    L_CLIP --> RESULT
+    APPLESCRIPT --> RESULT
+    M_CLIP --> RESULT
 
     RESULT -->|Yes| DONE[Text appears in<br/>focused window]
     RESULT -->|No| ERR[Error message<br/>in terminal]
@@ -514,9 +542,9 @@ The threading lock (`_lock`) ensures that:
 
 ---
 
-## CUDA Initialization
+## CUDA Initialization (Linux Only)
 
-How TAK pre-loads NVIDIA libraries before the Whisper model is initialized. This runs on Linux only, triggered by `tak.platforms.linux.platform_setup()` during startup.
+How TAK pre-loads NVIDIA libraries before the Whisper model is initialized. This runs on Linux only, triggered by `tak.platforms.linux.platform_setup()` during startup. For macOS, MLX handles GPU initialization automatically — see [platform-architecture.md](platform-architecture.md) for the full cross-platform comparison.
 
 ```mermaid
 sequenceDiagram
