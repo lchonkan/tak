@@ -257,6 +257,10 @@ export HF_ENDPOINT=https://hf-mirror.com
 ./run.sh
 ```
 
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the branching model, commit conventions, and PR guidelines.
+
 ## License
 
 MIT
