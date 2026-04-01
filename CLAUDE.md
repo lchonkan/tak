@@ -42,30 +42,46 @@ This project uses Git Flow. Read `CONTRIBUTING.md` for the full spec. Key rules:
 
 TAK is a modular push-to-talk speech-to-text app. The architecture uses dependency injection to keep platform code separated.
 
+### Package structure
+
+```
+tak/                            # Python package
+├── __init__.py                 # Package marker + __version__
+├── __main__.py                 # Entry point (platform detection, backend wiring)
+├── app.py                      # Shared core (TakApp, base classes, CLI, constants)
+├── platforms/
+│   ├── __init__.py
+│   ├── linux.py                # Linux backend
+│   └── macos.py                # macOS backend (planned)
+└── ui/                         # UI layer (planned)
+    └── __init__.py
+```
+
 ### File responsibilities
 
 | File | Role | Rules |
 |------|------|-------|
-| `tak.py` | Entry point | Only file that does platform detection. Imports the correct backend and wires it into `TakApp`. |
-| `tak_core.py` | Shared core | **Zero platform-specific imports.** No `import platform`, no `if IS_MACOS`. Contains `TakApp`, base classes (`BaseAudioRecorder`, `BaseTranscriber`), `parse_args()`, constants, color helpers, `_resample()`, `KEY_MAP`. |
-| `tak_linux.py` | Linux backend | `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()`, `ensure_cuda_libs()`, `platform_setup()`, `get_default_model()`, `get_platform_label()`. Imports from `tak_core` only. |
-| `tak_macos.py` | macOS backend (planned) | Same interface as `tak_linux.py` but with macOS implementations. See `docs/macos-implementation-plan.md`. |
-| `run.sh` | Launcher | Activates conda env, sets CUDA paths on Linux only, runs `tak.py`. |
+| `tak/__main__.py` | Entry point | Only file that does platform detection. Imports the correct backend and wires it into `TakApp`. |
+| `tak/app.py` | Shared core | **Zero platform-specific imports.** No `import platform`, no `if IS_MACOS`. Contains `TakApp`, base classes (`BaseAudioRecorder`, `BaseTranscriber`), `parse_args()`, constants, color helpers, `_resample()`, `KEY_MAP`. |
+| `tak/platforms/linux.py` | Linux backend | `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()`, `ensure_cuda_libs()`, `platform_setup()`, `get_default_model()`, `get_platform_label()`. Imports from `tak.app` only. |
+| `tak/platforms/macos.py` | macOS backend (planned) | Same interface as `linux.py` but with macOS implementations. See `docs/macos-implementation-plan.md`. |
+| `run.sh` | Launcher | Activates conda env, sets CUDA paths on Linux only, runs `python -m tak`. |
 
 ### Design rules
 
-- **No platform branching in core.** All `if IS_MACOS` / `if IS_LINUX` logic lives in `tak.py` only.
+- **No platform branching in core.** All `if IS_MACOS` / `if IS_LINUX` logic lives in `tak/__main__.py` only.
 - **Constructor injection.** `TakApp` receives backends as arguments — it never imports a platform module.
-- **Platform modules are self-contained.** Deleting `tak_linux.py` on a Mac or `tak_macos.py` on Linux must not cause errors.
+- **Platform modules are self-contained.** Deleting `linux.py` on a Mac or `macos.py` on Linux must not cause errors.
 - **Local imports for heavy deps.** `faster_whisper` and `mlx_whisper` are imported inside `__init__()`, not at module level.
 - **Shared utilities stay in core.** Resampling, normalization, colors, constants, CLI parsing.
+- **All imports are absolute.** Use `from tak.app import ...` and `from tak.platforms import linux`, not relative imports.
 
 ### Adding a new platform
 
-1. Create `tak_<platform>.py` implementing the same interface (see `tak_linux.py` as reference)
-2. Add the platform branch in `tak.py`
+1. Create `tak/platforms/<platform>.py` implementing the same interface (see `tak/platforms/linux.py` as reference)
+2. Add the platform branch in `tak/__main__.py`
 3. Create `requirements-<platform>.txt`
-4. Do not modify `tak_core.py` or existing platform files
+4. Do not modify `tak/app.py` or existing platform files
 
 ## Code Style
 
@@ -80,7 +96,6 @@ TAK is a modular push-to-talk speech-to-text app. The architecture uses dependen
 - `CONTRIBUTING.md` — Git Flow, commit conventions, PR guidelines
 - `docs/architecture.md` — System diagrams, class hierarchy, threading model
 - `docs/macos-implementation-plan.md` — Full spec for macOS implementation
-- `Migrationguide.md` — Original cross-platform migration plan
 
 ## Running and Testing
 
@@ -90,6 +105,7 @@ TAK is a modular push-to-talk speech-to-text app. The architecture uses dependen
 ./run.sh --clipboard        # clipboard paste mode
 ./run.sh --key caps_lock    # different trigger key
 ./run.sh --model small      # smaller/faster model
+python -m tak --help        # direct invocation (after conda activate tak)
 ```
 
 There are no automated tests yet. Verify changes manually using the commands above and the verification checklists in `docs/macos-implementation-plan.md`.

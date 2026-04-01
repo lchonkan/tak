@@ -6,9 +6,9 @@ Push-to-talk speech-to-text that types anywhere.
 Cross-platform: Linux (X11) and macOS.
 
 Usage:
-    python tak.py                  # default: hold Right-Ctrl to talk
-    python tak.py --key scroll_lock
-    python tak.py --model large-v3
+    python -m tak                  # default: hold Right-Ctrl to talk
+    python -m tak --key scroll_lock
+    python -m tak --model large-v3
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import sys
 
 
 def main():
-    from tak_core import parse_args, KEY_MAP, error, warn
+    from tak.app import parse_args, KEY_MAP, error, warn
 
     args = parse_args()
 
@@ -27,9 +27,9 @@ def main():
 
     # ── Import platform backend ──────────────────────────────────
     if IS_MACOS:
-        import tak_macos as backend
+        from tak.platforms import macos as backend
     elif IS_LINUX:
-        import tak_linux as backend
+        from tak.platforms import linux as backend
     else:
         error(f"Unsupported platform: {platform.system()}")
         sys.exit(1)
@@ -59,7 +59,7 @@ def main():
         transcriber = backend.LinuxTranscriber(model_size, device=device, compute_type=compute_type)
 
     # ── Build and run app ────────────────────────────────────────
-    from tak_core import TakApp
+    from tak.app import TakApp
 
     app = TakApp(
         trigger_key=trigger_key,

@@ -61,17 +61,17 @@ TAK is split into three modules with a clear dependency flow. Platform branching
 
 ```mermaid
 graph TD
-    subgraph "tak.py — Entry Point"
+    subgraph "tak/__main__.py — Entry Point"
         EP[Platform detection<br/>Backend wiring<br/>Dependency injection]
     end
 
-    subgraph "tak_core.py — Shared Core"
+    subgraph "tak/app.py — Shared Core"
         TAKAPP[TakApp]
         BASE[BaseAudioRecorder<br/>BaseTranscriber]
         UTIL[parse_args · colors · constants<br/>KEY_MAP · _resample · normalize]
     end
 
-    subgraph "tak_linux.py — Linux Backend"
+    subgraph "tak/platforms/linux.py — Linux Backend"
         CUDA_INIT[ensure_cuda_libs]
         LINUX_TR[LinuxTranscriber]
         LINUX_REC[LinuxAudioRecorder]
@@ -90,9 +90,9 @@ graph TD
 
 ### Design Principles
 
-- **No `if IS_MACOS` inside core.** Platform branching happens only in `tak.py` (entry point).
+- **No `if IS_MACOS` inside core.** Platform branching happens only in `tak/__main__.py` (entry point).
 - **Constructor injection.** `TakApp` receives backends as arguments — it never imports a platform module.
-- **Each platform file is self-contained.** Deleting `tak_linux.py` on a Mac causes no errors.
+- **Each platform file is self-contained.** Deleting `tak/platforms/linux.py` on a Mac causes no errors.
 - **Shared utilities in core.** Resampling, normalization, colors, constants, CLI parsing — all platform-agnostic.
 
 ---
@@ -103,14 +103,14 @@ A detailed view of all components, their responsibilities, and how they intercon
 
 ```mermaid
 graph TD
-    subgraph "tak_core.py — Platform-Agnostic"
+    subgraph "tak/app.py — Platform-Agnostic"
         PYNPUT[pynput<br/>Keyboard Listener]
         TAKAPP[TakApp<br/>Main Controller]
         BASE_REC[BaseAudioRecorder<br/>ABC]
         BASE_TR[BaseTranscriber<br/>ABC]
     end
 
-    subgraph "tak_linux.py — Linux Backend"
+    subgraph "tak/platforms/linux.py — Linux Backend"
         subgraph Input Layer
             PWREC[pw-record<br/>PipeWire Audio]
             SDEV[sounddevice<br/>ALSA Fallback]
@@ -221,9 +221,9 @@ classDiagram
 
 | Class / Function | Module |
 |---|---|
-| `TakApp`, `BaseAudioRecorder`, `BaseTranscriber`, `parse_args()` | `tak_core.py` |
-| `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()` | `tak_linux.py` |
-| Platform detection, backend wiring | `tak.py` |
+| `TakApp`, `BaseAudioRecorder`, `BaseTranscriber`, `parse_args()` | `tak/app.py` |
+| `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/platforms/linux.py` |
+| Platform detection, backend wiring | `tak/__main__.py` |
 
 ---
 
@@ -235,11 +235,11 @@ The complete lifecycle of a single push-to-talk interaction.
 sequenceDiagram
     actor User
     participant KL as Key Listener<br/>(pynput)
-    participant App as TakApp<br/>(tak_core)
-    participant Rec as LinuxAudioRecorder<br/>(tak_linux)
+    participant App as TakApp<br/>(tak/app)
+    participant Rec as LinuxAudioRecorder<br/>(tak/platforms/linux)
     participant PW as pw-record / ALSA
     participant Mic as Microphone
-    participant Trans as LinuxTranscriber<br/>(tak_linux)
+    participant Trans as LinuxTranscriber<br/>(tak/platforms/linux)
     participant Whisper as faster-whisper
     participant XDO as xdotool
 
@@ -434,12 +434,12 @@ The threading lock (`_lock`) ensures that:
 
 ## CUDA Initialization
 
-How TAK pre-loads NVIDIA libraries before the Whisper model is initialized. This runs on Linux only, triggered by `tak_linux.platform_setup()` during startup.
+How TAK pre-loads NVIDIA libraries before the Whisper model is initialized. This runs on Linux only, triggered by `tak.platforms.linux.platform_setup()` during startup.
 
 ```mermaid
 sequenceDiagram
-    participant EP as tak.py (entry point)
-    participant LINUX as tak_linux.py
+    participant EP as tak/__main__.py
+    participant LINUX as platforms/linux.py
     participant CTYPES as ctypes
     participant FS as Filesystem
     participant CUDA as CUDA Libraries

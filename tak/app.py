@@ -234,13 +234,13 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python tak.py                          # Hold Right-Ctrl to talk
-  python tak.py --key scroll_lock        # Use Scroll Lock instead
-  python tak.py --key caps_lock          # Use Caps Lock (good for MacBooks)
-  python tak.py --model large-v3         # More accurate (slower)
-  python tak.py --model turbo            # Fast + accurate (macOS default)
-  python tak.py --clipboard              # Use clipboard paste
-  python tak.py --cpu                    # Run on CPU (no GPU needed)
+  python -m tak                          # Hold Right-Ctrl to talk
+  python -m tak --key scroll_lock        # Use Scroll Lock instead
+  python -m tak --key caps_lock          # Use Caps Lock (good for MacBooks)
+  python -m tak --model large-v3         # More accurate (slower)
+  python -m tak --model turbo            # Fast + accurate (macOS default)
+  python -m tak --clipboard              # Use clipboard paste
+  python -m tak --cpu                    # Run on CPU (no GPU needed)
 
 Available keys:
   ctrl_r (default), ctrl_l, alt_r, alt_l, shift_r, shift_l,
