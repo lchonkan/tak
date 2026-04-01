@@ -1,7 +1,7 @@
 # TAK — Talk to Keyboard
 
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Linux%20%2F%20X11-FCC624?logo=linux&logoColor=black)
+![Platform](https://img.shields.io/badge/Platform-Linux%20%2F%20X11%20·%20macOS-FCC624?logo=linux&logoColor=black)
 ![CUDA](https://img.shields.io/badge/CUDA-GPU%20Accelerated-76B900?logo=nvidia&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Speech](https://img.shields.io/badge/Speech--to--Text-Whisper-FF6F00?logo=openai&logoColor=white)
@@ -9,7 +9,7 @@
 ![GitHub repo size](https://img.shields.io/github/repo-size/lchonkan/tak)
 ![GitHub last commit](https://img.shields.io/github/last-commit/lchonkan/tak)
 
-Push-to-talk speech-to-text that types anywhere on Linux.
+Push-to-talk speech-to-text that types anywhere.
 
 Hold a key → speak → release → your words appear wherever you're typing.
 Works in any application — terminals, browsers, editors, chat apps, anything with a text cursor.
@@ -18,14 +18,18 @@ Works in any application — terminals, browsers, editors, chat apps, anything w
 
 - **Push-to-talk** — microphone is only open while you hold the key (no always-on listening)
 - **System-wide** — types into whatever window/field currently has focus
+- **Cross-platform** — Linux (X11) and macOS (planned)
 - **Bilingual** — auto-detects English and Spanish
 - **Local & private** — runs entirely on your machine via [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (no cloud APIs)
-- **GPU-accelerated** — uses CUDA on your NVIDIA GPU for fast transcription
+- **GPU-accelerated** — uses CUDA on your NVIDIA GPU for fast transcription (Linux)
 - **Auto-normalization** — automatically boosts quiet microphone levels
 - **Voice activity detection** — filters out silence and background noise
+- **Modular architecture** — platform-agnostic core with pluggable backends
 - **Configurable** — choose your trigger key, model size, and input method
 
 ## Requirements
+
+### Linux
 
 - Linux with X11 (Wayland support planned)
 - NVIDIA GPU with CUDA (or use `--cpu` for CPU-only)
@@ -34,20 +38,28 @@ Works in any application — terminals, browsers, editors, chat apps, anything w
 
 ## Installation
 
-### 1. Install system dependencies
+### Linux
+
+#### 1. Install system dependencies
 
 ```bash
 sudo apt install xdotool xclip libportaudio2
 ```
 
-### 2. Create the Conda environment
+#### 2. Create the Conda environment
 
 ```bash
 conda create -n tak python=3.11 -y
 conda activate tak
 ```
 
-### 3. Install Python dependencies
+#### 3. Install Python dependencies
+
+```bash
+pip install -r requirements-linux.txt
+```
+
+Or install manually:
 
 ```bash
 pip install faster-whisper pynput sounddevice numpy
@@ -59,7 +71,7 @@ For GPU acceleration (recommended), also install the CUDA libraries:
 pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
 ```
 
-### 4. Input permissions
+#### 4. Input permissions
 
 `pynput` needs access to `/dev/input` to detect key presses. Add your user to the `input` group:
 
@@ -126,26 +138,41 @@ Models are downloaded on first use and cached in `~/.cache/huggingface/hub/`.
 TAK has three main stages that run in a loop:
 
 1. **Key listener** — `pynput` monitors for the trigger key. On press, recording starts; on release, recording stops.
-2. **Audio recording** — Captures audio via PipeWire (`pw-record`) for proper device routing, or falls back to ALSA via `sounddevice`. Audio is recorded at 16 kHz mono (Whisper's native format). Quiet audio is auto-normalized so Whisper can hear it.
-3. **Transcription & typing** — `faster-whisper` transcribes the audio locally using your GPU (or CPU). The detected text is then typed into the focused window using `xdotool`, or pasted via clipboard as a fallback.
+2. **Audio recording** — On Linux, captures audio via PipeWire (`pw-record`) for proper device routing, or falls back to ALSA via `sounddevice`. Audio is recorded at 16 kHz mono (Whisper's native format). Quiet audio is auto-normalized so Whisper can hear it.
+3. **Transcription & typing** — `faster-whisper` transcribes the audio locally using your GPU (or CPU). The detected text is then typed into the focused window using platform-specific text injection (xdotool on Linux).
 
 Transcription runs in a background thread so the key listener stays responsive. If you start a new recording while the previous one is still being transcribed, it waits until the current transcription finishes.
 
 ## Architecture
 
-```mermaid
-graph LR
-    User((User)) -->|holds trigger key| TAK
+TAK uses a modular architecture with dependency injection. The core application logic is platform-agnostic, while platform-specific backends (audio recording, transcription, text injection) are plugged in at startup.
 
-    subgraph TAK["TAK Application"]
-        KL[Key Listener] --> AR[Audio Recorder]
-        AR --> TR[Transcriber]
-        TR --> TI[Text Injector]
+```mermaid
+graph TD
+    subgraph "tak.py (Entry Point)"
+        EP[Platform Detection] --> |Linux| LINUX[tak_linux]
+        EP --> |macOS| MACOS[tak_macos]
     end
 
-    AR -.->|pw-record / ALSA| Mic[Microphone]
-    TR -.->|faster-whisper| GPU[GPU / CPU]
-    TI -.->|xdotool / xclip| FW[Focused Window]
+    subgraph "tak_core.py (Shared)"
+        APP[TakApp]
+        BASE_REC[BaseAudioRecorder]
+        BASE_TR[BaseTranscriber]
+        PARSE[parse_args]
+    end
+
+    subgraph "tak_linux.py (Linux Backend)"
+        LREC[LinuxAudioRecorder<br/>PipeWire / ALSA]
+        LTR[LinuxTranscriber<br/>faster-whisper + CUDA]
+        LTI[type_text<br/>xdotool / xclip]
+    end
+
+    LINUX --> |injects backends| APP
+    LREC --> |extends| BASE_REC
+    LTR --> |extends| BASE_TR
+    APP --> |uses| LREC
+    APP --> |uses| LTR
+    APP --> |uses| LTI
 ```
 
 For detailed architecture diagrams (class diagrams, sequence diagrams, state machines, threading model, audio pipeline, and more), see **[docs/architecture.md](docs/architecture.md)**.
@@ -154,11 +181,15 @@ For detailed architecture diagrams (class diagrams, sequence diagrams, state mac
 
 ```
 tak/
-├── tak.py             # Main application (all logic in one file)
-├── run.sh             # Launcher script (activates conda env + CUDA paths)
-├── README.md          # This file
+├── tak.py                  # Entry point — detects platform, wires backends, runs app
+├── tak_core.py             # Shared: TakApp, CLI parser, colors, constants, base classes
+├── tak_linux.py            # Linux: LinuxTranscriber, LinuxAudioRecorder, xdotool/xclip
+├── run.sh                  # Cross-platform launcher (activates conda env + CUDA paths)
+├── requirements-linux.txt  # Linux Python dependencies
+├── README.md               # This file
+├── LICENSE
 ├── docs/
-│   └── architecture.md  # Detailed architecture diagrams
+│   └── architecture.md     # Detailed architecture diagrams
 └── .gitignore
 ```
 
