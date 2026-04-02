@@ -394,11 +394,26 @@
       <p class="subtitle">Up and running in under 2 minutes.</p>
 
       <div class="install-tabs">
-        <button class="tab-btn active" onclick="switchTab('macos')">macOS</button>
-        <button class="tab-btn" onclick="switchTab('linux')">Linux</button>
+        <button class="tab-btn active" onclick="switchTab('quick')">Quick Install</button>
+        <button class="tab-btn" onclick="switchTab('macos')">macOS (manual)</button>
+        <button class="tab-btn" onclick="switchTab('linux')">Linux (manual)</button>
       </div>
 
-      <div id="tab-macos" class="tab-content active">
+      <div id="tab-quick" class="tab-content active">
+        <pre><span class="comment"># Clone and run the installer (macOS or Linux)</span>
+<span class="cmd">git clone https://github.com/lchonkan/tak.git</span>
+<span class="cmd">cd tak</span>
+<span class="cmd">./install.sh</span>
+
+<span class="comment"># The installer detects your platform, installs</span>
+<span class="comment"># dependencies, sets up the conda environment,</span>
+<span class="comment"># and verifies everything works.</span>
+
+<span class="comment"># Then run:</span>
+<span class="cmd">./run.sh</span></pre>
+      </div>
+
+      <div id="tab-macos" class="tab-content">
         <pre><span class="comment"># Install system dependencies</span>
 <span class="cmd">brew install portaudio ffmpeg</span>
 
