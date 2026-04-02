@@ -52,7 +52,7 @@ tak/                            # Python package
 ├── platforms/
 │   ├── __init__.py
 │   ├── linux.py                # Linux backend
-│   └── macos.py                # macOS backend (planned)
+│   └── macos.py                # macOS backend (mlx-whisper, Core Audio, AppleScript)
 └── ui/                         # UI layer (planned)
     └── __init__.py
 ```
@@ -64,7 +64,7 @@ tak/                            # Python package
 | `tak/__main__.py` | Entry point | Only file that does platform detection. Imports the correct backend and wires it into `TakApp`. |
 | `tak/app.py` | Shared core | **Zero platform-specific imports.** No `import platform`, no `if IS_MACOS`. Contains `TakApp`, base classes (`BaseAudioRecorder`, `BaseTranscriber`), `parse_args()`, constants, color helpers, `_resample()`, `KEY_MAP`. |
 | `tak/platforms/linux.py` | Linux backend | `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()`, `ensure_cuda_libs()`, `platform_setup()`, `get_default_model()`, `get_platform_label()`. Imports from `tak.app` only. |
-| `tak/platforms/macos.py` | macOS backend (planned) | Same interface as `linux.py` but with macOS implementations. See `docs/macos-implementation-plan.md`. |
+| `tak/platforms/macos.py` | macOS backend | `MacAudioRecorder`, `MacTranscriber`, `type_text()`, `type_text_clipboard()`, `check_accessibility_permission()`, `adjust_key_map()`, `_write_wav()`, `platform_setup()`, `get_default_model()`, `get_platform_label()`. Uses mlx-whisper (Metal), Core Audio (sounddevice), AppleScript (osascript). Imports from `tak.app` only. |
 | `run.sh` | Launcher | Activates conda env, sets CUDA paths on Linux only, runs `python -m tak`. |
 
 ### Design rules
@@ -95,7 +95,8 @@ tak/                            # Python package
 
 - `CONTRIBUTING.md` — Git Flow, commit conventions, PR guidelines
 - `docs/architecture.md` — System diagrams, class hierarchy, threading model
-- `docs/macos-implementation-plan.md` — Full spec for macOS implementation
+- `docs/platform-architecture.md` — Cross-platform stack comparison diagrams
+- `docs/macos-implementation-plan.md` — macOS implementation spec (completed)
 
 ## Running and Testing
 

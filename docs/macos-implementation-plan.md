@@ -1,29 +1,30 @@
 # macOS Implementation Plan
 
-Development guide for adding macOS support to TAK. This work happens entirely in new files — **no changes to `tak/app.py` or `tak/platforms/linux.py` are needed**.
+> **✅ Status: COMPLETED.** All deliverables have been implemented. This document is retained as a reference for the design decisions made during implementation.
+
+Development guide for adding macOS support to TAK. This work happened entirely in new files — no changes to `tak/app.py` or `tak/platforms/linux.py` were needed.
 
 ## Current State
 
-Phase 1 (Linux refactoring) is complete. The codebase is modular:
+macOS support is fully implemented. The codebase is modular:
 
 ```
-tak/__main__.py         → entry point, platform detection, backend wiring (macOS path ready)
+tak/__main__.py         → entry point, platform detection, backend wiring
 tak/app.py              → shared: TakApp, base classes, CLI, colors, constants
 tak/platforms/linux.py  → Linux: faster-whisper, PipeWire/ALSA, xdotool/xclip
+tak/platforms/macos.py  → macOS: mlx-whisper, Core Audio, AppleScript
 ```
-
-The entry point (`tak/__main__.py`) already contains the macOS branching logic — it imports `tak.platforms.macos` when `platform.system() == "Darwin"` and wires `MacAudioRecorder`, `MacTranscriber`, `type_text`, and `type_text_clipboard` into `TakApp`. **The only missing piece is the `tak/platforms/macos.py` file itself.**
 
 ## Deliverables
 
-| File | Action | Description |
+| File | Status | Description |
 |------|--------|-------------|
-| `tak/platforms/macos.py` | **Create** | macOS backends (all new code) |
-| `requirements-macos.txt` | **Create** | macOS Python dependencies |
-| `README.md` | **Update** | Add macOS installation section, update model table |
-| `docs/architecture.md` | **Update** | Add macOS backend to diagrams |
+| `tak/platforms/macos.py` | **✅ Done** | macOS backends (mlx-whisper, Core Audio, AppleScript) |
+| `requirements-macos.txt` | **✅ Done** | macOS Python dependencies |
+| `README.md` | **✅ Done** | macOS installation section, updated model table |
+| `docs/architecture.md` | **✅ Done** | macOS backend added to all diagrams |
 
-No changes to: `tak/__main__.py`, `tak/app.py`, `tak/platforms/linux.py`, `run.sh`.
+No changes were made to: `tak/__main__.py`, `tak/app.py`, `tak/platforms/linux.py`, `run.sh`.
 
 ---
 

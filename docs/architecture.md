@@ -1,10 +1,14 @@
 # TAK Architecture
 
 ![faster-whisper](https://img.shields.io/badge/ASR-faster--whisper-FF6F00?logo=openai&logoColor=white)
+![mlx-whisper](https://img.shields.io/badge/ASR-mlx--whisper-000000?logo=apple&logoColor=white)
 ![pynput](https://img.shields.io/badge/Input-pynput-4285F4)
 ![PipeWire](https://img.shields.io/badge/Audio-PipeWire%20%2F%20ALSA-629FF4)
+![Core Audio](https://img.shields.io/badge/Audio-Core%20Audio-999999?logo=apple&logoColor=white)
 ![xdotool](https://img.shields.io/badge/Output-xdotool%20%2F%20xclip-E34F26)
+![AppleScript](https://img.shields.io/badge/Output-AppleScript-999999?logo=apple&logoColor=white)
 ![CTranslate2](https://img.shields.io/badge/Inference-CTranslate2-76B900?logo=nvidia&logoColor=white)
+![MLX](https://img.shields.io/badge/Inference-MLX%20%2F%20Metal-000000?logo=apple&logoColor=white)
 ![NumPy](https://img.shields.io/badge/NumPy-Audio%20Processing-013243?logo=numpy&logoColor=white)
 
 Detailed software architecture documentation for TAK (Talk to Keyboard).
@@ -48,9 +52,19 @@ graph LR
         XDO[xdotool / xclip]
     end
 
+    subgraph "macOS Dependencies"
+        CA[Core Audio]
+        MLX_MODEL[mlx-whisper]
+        AS[AppleScript]
+    end
+
     AR -.->|records via| PW
     TR -.->|uses| FW_MODEL
     TI -.->|types via| XDO
+
+    AR -.->|records via| CA
+    TR -.->|uses| MLX_MODEL
+    TI -.->|types via| AS
 ```
 
 ---
@@ -79,13 +93,27 @@ graph TD
         LINUX_IF[platform_setup · get_default_model<br/>get_platform_label]
     end
 
+    subgraph "tak/platforms/macos.py — macOS Backend"
+        ACC_CHK[check_accessibility_permission]
+        MAC_TR[MacTranscriber]
+        MAC_REC[MacAudioRecorder]
+        MAC_TI[type_text · type_text_clipboard]
+        MAC_IF[platform_setup · get_default_model<br/>get_platform_label]
+    end
+
     EP -->|imports| TAKAPP
     EP -->|imports on Linux| LINUX_IF
+    EP -->|imports on macOS| MAC_IF
     LINUX_TR -->|extends| BASE
     LINUX_REC -->|extends| BASE
+    MAC_TR -->|extends| BASE
+    MAC_REC -->|extends| BASE
     TAKAPP -->|uses injected| LINUX_TR
     TAKAPP -->|uses injected| LINUX_REC
     TAKAPP -->|uses injected| LINUX_TI
+    TAKAPP -->|uses injected| MAC_TR
+    TAKAPP -->|uses injected| MAC_REC
+    TAKAPP -->|uses injected| MAC_TI
 ```
 
 ### Design Principles
@@ -111,7 +139,7 @@ graph TD
     end
 
     subgraph "tak/platforms/linux.py — Linux Backend"
-        subgraph Input Layer
+        subgraph "Linux Input Layer"
             PWREC[pw-record<br/>PipeWire Audio]
             SDEV[sounddevice<br/>ALSA Fallback]
         end
@@ -119,15 +147,35 @@ graph TD
         AREC[LinuxAudioRecorder]
         TRANS[LinuxTranscriber]
 
-        subgraph Output Layer
+        subgraph "Linux Output Layer"
             XDOTOOL[xdotool<br/>Keystroke Simulation]
             XCLIP[xclip<br/>Clipboard Paste]
         end
 
-        subgraph ML Engine
+        subgraph "Linux ML Engine"
             WHISPER[faster-whisper<br/>Whisper Model]
             CT2[CTranslate2<br/>Inference Runtime]
             CUDA[CUDA / cuBLAS / cuDNN<br/>GPU Acceleration]
+        end
+    end
+
+    subgraph "tak/platforms/macos.py — macOS Backend"
+        subgraph "macOS Input Layer"
+            COREAUDIO[sounddevice<br/>Core Audio]
+        end
+
+        MAC_AREC[MacAudioRecorder]
+        MAC_TRANS[MacTranscriber]
+
+        subgraph "macOS Output Layer"
+            APPLESCRIPT[AppleScript<br/>Keystroke Simulation]
+            PBCOPY[pbcopy / pbpaste<br/>Clipboard Paste]
+        end
+
+        subgraph "macOS ML Engine"
+            MLX_WHISPER[mlx-whisper<br/>Whisper Model]
+            MLX[MLX Framework]
+            METAL[Metal<br/>GPU Acceleration]
         end
     end
 
@@ -137,22 +185,35 @@ graph TD
     TAKAPP -->|text| XDOTOOL
     TAKAPP -->|text| XCLIP
 
+    TAKAPP -->|start/stop| MAC_AREC
+    TAKAPP -->|audio data| MAC_TRANS
+    TAKAPP -->|text| APPLESCRIPT
+    TAKAPP -->|text| PBCOPY
+
     AREC -->|implements| BASE_REC
     TRANS -->|implements| BASE_TR
+    MAC_AREC -->|implements| BASE_REC
+    MAC_TRANS -->|implements| BASE_TR
 
     AREC -->|primary| PWREC
     AREC -->|fallback| SDEV
 
+    MAC_AREC --> COREAUDIO
+
     TRANS --> WHISPER
     WHISPER --> CT2
     CT2 --> CUDA
+
+    MAC_TRANS --> MLX_WHISPER
+    MLX_WHISPER --> MLX
+    MLX --> METAL
 ```
 
 ---
 
 ## Class Diagram
 
-The class hierarchy uses abstract base classes in `tak_core.py` with concrete implementations in platform modules. `TakApp` receives its dependencies via constructor injection.
+The class hierarchy uses abstract base classes in `tak/app.py` with concrete implementations in platform modules. `TakApp` receives its dependencies via constructor injection.
 
 ```mermaid
 classDiagram
@@ -209,8 +270,28 @@ classDiagram
         +transcribe(audio: ndarray) str
     }
 
+    class MacAudioRecorder {
+        -_device: int | None
+        -_recording: bool
+        -_stream: InputStream | None
+        -_chunks: list~ndarray~
+        -_hw_rate: int
+        +start()
+        +stop() ndarray | None
+        -_callback(indata, frames, time_info, status)
+    }
+
+    class MacTranscriber {
+        -_mlx_whisper: module
+        -_model_path: str
+        +__init__(model_size)
+        +transcribe(audio: ndarray) str
+    }
+
     BaseAudioRecorder <|-- LinuxAudioRecorder : extends
     BaseTranscriber <|-- LinuxTranscriber : extends
+    BaseAudioRecorder <|-- MacAudioRecorder : extends
+    BaseTranscriber <|-- MacTranscriber : extends
     TakApp --> BaseAudioRecorder : recorder (injected)
     TakApp --> BaseTranscriber : transcriber (injected)
     TakApp ..> type_fn : calls (injected)
@@ -223,13 +304,14 @@ classDiagram
 |---|---|
 | `TakApp`, `BaseAudioRecorder`, `BaseTranscriber`, `parse_args()` | `tak/app.py` |
 | `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/platforms/linux.py` |
+| `MacAudioRecorder`, `MacTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/platforms/macos.py` |
 | Platform detection, backend wiring | `tak/__main__.py` |
 
 ---
 
 ## Push-to-Talk Sequence
 
-The complete lifecycle of a single push-to-talk interaction.
+The complete lifecycle of a single push-to-talk interaction. The Linux backend is shown below; macOS follows the same pattern with `MacAudioRecorder` → Core Audio and `MacTranscriber` → mlx-whisper → AppleScript.
 
 ```mermaid
 sequenceDiagram
@@ -319,11 +401,14 @@ How audio flows from microphone to Whisper-ready format.
 ```mermaid
 graph TD
     subgraph Recording
-        MIC[Microphone Input] --> ROUTE{PipeWire<br/>available?}
+        MIC[Microphone Input] --> PLAT{Platform?}
+        PLAT -->|Linux| ROUTE{PipeWire<br/>available?}
+        PLAT -->|macOS| COREAUDIO[sounddevice<br/>Core Audio<br/>native rate]
         ROUTE -->|Yes| PW[pw-record<br/>16kHz mono s16]
-        ROUTE -->|No| SD[sounddevice<br/>native rate]
+        ROUTE -->|No| SD[sounddevice<br/>ALSA<br/>native rate]
         PW --> WAV[WAV file on disk]
         SD --> CHUNKS[In-memory chunks]
+        COREAUDIO --> CHUNKS
     end
 
     subgraph Processing
@@ -347,13 +432,21 @@ graph TD
         BOOST --> OUT
     end
 
-    OUT[16kHz float32 mono<br/>normalized audio] --> WHISPER[faster-whisper]
+    OUT[16kHz float32 mono<br/>normalized audio] --> ENGINE{Platform?}
 
-    subgraph Transcription
-        WHISPER --> VAD[Voice Activity Detection<br/>threshold: 0.3]
+    subgraph "Linux Transcription"
+        ENGINE -->|Linux| FW[faster-whisper]
+        FW --> VAD[Voice Activity Detection<br/>threshold: 0.3]
         VAD --> LANG[Language Detection<br/>English / Spanish]
         LANG --> BEAM[Beam Search<br/>beam_size: 5]
-        BEAM --> TEXT[Transcribed Text]
+        BEAM --> TEXT1[Transcribed Text]
+    end
+
+    subgraph "macOS Transcription"
+        ENGINE -->|macOS| TMPWAV[Write temp WAV]
+        TMPWAV --> MLX[mlx-whisper]
+        MLX --> MLANG[Language Detection<br/>English / Spanish]
+        MLANG --> TEXT2[Transcribed Text]
     end
 ```
 
@@ -361,28 +454,45 @@ graph TD
 
 ## Text Injection Flow
 
-How transcribed text gets typed into the target application (Linux shown — uses xdotool/xclip from `tak_linux.py`).
+How transcribed text gets typed into the target application. Each platform uses its own tools for keystroke simulation and clipboard paste.
 
 ```mermaid
 graph TD
     TEXT[Transcribed Text] --> EMPTY{Text is<br/>empty?}
     EMPTY -->|Yes| SKIP[Skip - no speech detected]
-    EMPTY -->|No| MODE{Clipboard<br/>mode?}
+    EMPTY -->|No| PLAT{Platform?}
 
-    MODE -->|No| XDOTOOL[xdotool type<br/>--clearmodifiers<br/>--delay 12ms]
-    MODE -->|Yes| CLIP_FLOW
+    PLAT -->|Linux| L_MODE{Clipboard<br/>mode?}
+    PLAT -->|macOS| M_MODE{Clipboard<br/>mode?}
 
-    subgraph CLIP_FLOW [Clipboard Paste Flow]
-        SAVE[Save current clipboard<br/>via xclip -o]
-        SET[Set clipboard to text<br/>via xclip]
-        PASTE[Simulate Ctrl+V<br/>via xdotool key]
-        WAIT[Wait 100ms]
-        RESTORE[Restore original clipboard]
-        SAVE --> SET --> PASTE --> WAIT --> RESTORE
+    L_MODE -->|No| XDOTOOL[xdotool type<br/>--clearmodifiers<br/>--delay 12ms]
+    L_MODE -->|Yes| L_CLIP
+
+    M_MODE -->|No| APPLESCRIPT[osascript<br/>AppleScript keystroke]
+    M_MODE -->|Yes| M_CLIP
+
+    subgraph L_CLIP ["Linux Clipboard Paste"]
+        LC1[xclip -o · save clipboard]
+        LC2[xclip · set text]
+        LC3[xdotool key ctrl+v]
+        LC4[sleep 100ms]
+        LC5[xclip · restore clipboard]
+        LC1 --> LC2 --> LC3 --> LC4 --> LC5
+    end
+
+    subgraph M_CLIP ["macOS Clipboard Paste"]
+        MC1[pbpaste · save clipboard]
+        MC2[pbcopy · set text]
+        MC3[osascript Cmd+V]
+        MC4[sleep 100ms]
+        MC5[pbcopy · restore clipboard]
+        MC1 --> MC2 --> MC3 --> MC4 --> MC5
     end
 
     XDOTOOL --> RESULT{Success?}
-    CLIP_FLOW --> RESULT
+    L_CLIP --> RESULT
+    APPLESCRIPT --> RESULT
+    M_CLIP --> RESULT
 
     RESULT -->|Yes| DONE[Text appears in<br/>focused window]
     RESULT -->|No| ERR[Error message<br/>in terminal]
@@ -432,9 +542,9 @@ The threading lock (`_lock`) ensures that:
 
 ---
 
-## CUDA Initialization
+## CUDA Initialization (Linux Only)
 
-How TAK pre-loads NVIDIA libraries before the Whisper model is initialized. This runs on Linux only, triggered by `tak.platforms.linux.platform_setup()` during startup.
+How TAK pre-loads NVIDIA libraries before the Whisper model is initialized. This runs on Linux only, triggered by `tak.platforms.linux.platform_setup()` during startup. For macOS, MLX handles GPU initialization automatically — see [platform-architecture.md](platform-architecture.md) for the full cross-platform comparison.
 
 ```mermaid
 sequenceDiagram
