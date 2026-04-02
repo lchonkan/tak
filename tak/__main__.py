@@ -38,9 +38,10 @@ def main():
     backend.platform_setup()
 
     # ── Resolve trigger key ──────────────────────────────────────
-    trigger_key = KEY_MAP.get(args.key)
+    key_name = args.key if args.key != "ctrl_r" or not IS_MACOS else "alt_r"
+    trigger_key = KEY_MAP.get(key_name)
     if trigger_key is None:
-        error(f"Unknown key '{args.key}'. Available: {', '.join(KEY_MAP.keys())}")
+        error(f"Unknown key '{key_name}'. Available: {', '.join(KEY_MAP.keys())}")
         sys.exit(1)
 
     # ── Resolve model ────────────────────────────────────────────
@@ -67,7 +68,7 @@ def main():
         transcriber=transcriber,
         type_fn=backend.type_text,
         clipboard_fn=backend.type_text_clipboard,
-        use_clipboard=args.clipboard,
+        use_clipboard=args.clipboard or IS_MACOS,
         platform_label=backend.get_platform_label(),
     )
     app.run()
