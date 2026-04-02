@@ -17,6 +17,8 @@ Push-to-talk speech-to-text that types anywhere.
 Hold a key → speak → release → your words appear wherever you're typing.
 Works in any application — terminals, browsers, editors, chat apps, anything with a text cursor.
 
+![TAK Demo — macOS](docs/videos/demo-macos.gif)
+
 ## Features
 
 - **Push-to-talk** — microphone is only open while you hold the key (no always-on listening)
