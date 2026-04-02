@@ -58,69 +58,86 @@ class _PillView(AppKit.NSView):
 _RED = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.9, 0.2, 0.2, 0.92)
 _YELLOW = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.85, 0.65, 0.1, 0.92)
 
+_PILL_W, _PILL_H = 70, 26
+_MARGIN_BOTTOM = 10  # gap from bottom of screen
+
+
+# ─── Per-screen panel builder ───────────────────────────────────────────
+def _make_panel():
+    """Create a single floating pill panel (not yet positioned)."""
+    panel_rect = Foundation.NSMakeRect(0, 0, _PILL_W, _PILL_H)
+
+    panel = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+        panel_rect,
+        AppKit.NSWindowStyleMaskBorderless | AppKit.NSWindowStyleMaskNonactivatingPanel,
+        AppKit.NSBackingStoreBuffered,
+        False,
+    )
+    panel.setLevel_(AppKit.NSStatusWindowLevel)
+    panel.setOpaque_(False)
+    panel.setBackgroundColor_(AppKit.NSColor.clearColor())
+    panel.setIgnoresMouseEvents_(True)
+    panel.setHasShadow_(True)
+    panel.setCollectionBehavior_(
+        AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
+        | AppKit.NSWindowCollectionBehaviorStationary
+        | AppKit.NSWindowCollectionBehaviorFullScreenAuxiliary
+    )
+
+    pill = _PillView.alloc().initWithFrame_(
+        Foundation.NSMakeRect(0, 0, _PILL_W, _PILL_H)
+    )
+    panel.contentView().addSubview_(pill)
+
+    return panel, pill
+
+
+def _center_bottom(screen):
+    """Return (x, y) to place a pill centered at the bottom of a screen."""
+    frame = screen.visibleFrame()
+    x = frame.origin.x + (frame.size.width - _PILL_W) / 2
+    y = frame.origin.y + _MARGIN_BOTTOM
+    return (x, y)
+
 
 # ─── Overlay controller ────────────────────────────────────────────────
 class MacOverlay(BaseOverlay):
-    """Floating pill overlay for recording/transcribing state."""
+    """Floating pill overlay on every screen, centered at the bottom."""
 
     def __init__(self):
-        self._panel = None
-        self._pill = None
-        self._built = False
+        self._panels = []  # list of (panel, pill) tuples
 
-    def _build(self):
-        """Build the NSPanel and pill view. Must be called on the main thread."""
-        if self._built:
-            return
+    def _sync_screens(self):
+        """Ensure one panel per screen, creating/removing as needed.
 
-        screen = AppKit.NSScreen.mainScreen()
-        screen_frame = screen.visibleFrame()
+        Must be called on the main thread.
+        """
+        screens = AppKit.NSScreen.screens()
+        current_count = len(self._panels)
+        needed = len(screens)
 
-        pill_w, pill_h = 70, 26
-        x = screen_frame.origin.x + (screen_frame.size.width - pill_w) / 2
-        y = screen_frame.origin.y + screen_frame.size.height - pill_h - 8
+        # Add panels for new screens
+        while len(self._panels) < needed:
+            self._panels.append(_make_panel())
 
-        panel_rect = Foundation.NSMakeRect(x, y, pill_w, pill_h)
+        # Remove extra panels
+        while len(self._panels) > needed:
+            panel, _ = self._panels.pop()
+            panel.orderOut_(None)
 
-        panel = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
-            panel_rect,
-            AppKit.NSWindowStyleMaskBorderless | AppKit.NSWindowStyleMaskNonactivatingPanel,
-            AppKit.NSBackingStoreBuffered,
-            False,
-        )
-        panel.setLevel_(AppKit.NSStatusWindowLevel)
-        panel.setOpaque_(False)
-        panel.setBackgroundColor_(AppKit.NSColor.clearColor())
-        panel.setIgnoresMouseEvents_(True)
-        panel.setHasShadow_(True)
-        panel.setCollectionBehavior_(
-            AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
-            | AppKit.NSWindowCollectionBehaviorStationary
-            | AppKit.NSWindowCollectionBehaviorFullScreenAuxiliary
-        )
-
-        pill = _PillView.alloc().initWithFrame_(
-            Foundation.NSMakeRect(0, 0, pill_w, pill_h)
-        )
-        panel.contentView().addSubview_(pill)
-
-        self._panel = panel
-        self._pill = pill
-        self._built = True
-
-    def _dispatch(self, block):
-        """Run block on the main thread."""
-        AppKit.NSApp.performSelectorOnMainThread_withObject_waitUntilDone_(
-            Foundation.NSSelectorFromString("performBlock:"), block, False
-        )
+        # Position each panel at center-bottom of its screen
+        for (panel, _), screen in zip(self._panels, screens):
+            x, y = _center_bottom(screen)
+            panel.setFrameOrigin_(Foundation.NSMakePoint(x, y))
 
     def _do_show(self, color, label):
-        """Show the overlay with given color and label. Thread-safe."""
+        """Show overlays on all screens. Thread-safe."""
         def _inner():
-            self._build()
-            self._pill.setFillColor_(color)
-            self._pill.setLabel_(label)
-            self._panel.orderFront_(None)
+            self._sync_screens()
+            for panel, pill in self._panels:
+                pill.setFillColor_(color)
+                pill.setLabel_(label)
+                panel.orderFront_(None)
 
         if AppKit.NSThread.isMainThread():
             _inner()
@@ -135,8 +152,8 @@ class MacOverlay(BaseOverlay):
 
     def hide(self) -> None:
         def _inner():
-            if self._panel:
-                self._panel.orderOut_(None)
+            for panel, _ in self._panels:
+                panel.orderOut_(None)
 
         if AppKit.NSThread.isMainThread():
             _inner()

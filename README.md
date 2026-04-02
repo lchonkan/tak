@@ -25,6 +25,7 @@ Works in any application — terminals, browsers, editors, chat apps, anything w
 - **Auto-normalization** — automatically boosts quiet microphone levels
 - **Voice activity detection** — filters out silence and background noise
 - **Modular architecture** — platform-agnostic core with pluggable backends
+- **Visual overlay** — floating recording indicator on all screens (macOS)
 - **Configurable** — choose your trigger key, model size, and input method
 
 ## Requirements
@@ -90,40 +91,23 @@ sudo usermod -aG input $USER
 
 ### macOS
 
-#### 1. Install system dependencies
-
 ```bash
+# 1. Install system dependencies
 brew install portaudio ffmpeg
-```
 
-#### 2. Create the Conda environment
-
-```bash
+# 2. Create Conda environment and install Python packages
 conda create -n tak python=3.11 -y
 conda activate tak
-```
-
-#### 3. Install Python dependencies
-
-```bash
 pip install -r requirements-macos.txt
+
+# 3. Grant Accessibility permission (required for key detection)
+#    System Settings → Privacy & Security → Accessibility → add your terminal app
+
+# 4. Run
+./run.sh
 ```
 
-Or install manually:
-
-```bash
-pip install mlx-whisper pynput sounddevice numpy
-```
-
-#### 4. Accessibility permission
-
-`pynput` needs Accessibility permission to detect global key events:
-
-```
-System Settings → Privacy & Security → Accessibility → add your terminal app
-```
-
-TAK checks for this on startup and will show a clear error if it's missing.
+TAK checks for Accessibility permission on startup and will show a clear error if it's missing. macOS will also prompt for Microphone access on the first recording — click "Allow".
 
 ## Quick Start
 
@@ -142,6 +126,8 @@ Hold **Right Ctrl** → speak → release → text appears at cursor. Press `Ctr
 ```
 
 Hold **Right Option** → speak → release → text appears at cursor. Press `Ctrl+C` to quit.
+
+A red **REC** pill appears at the bottom of every screen while recording, turning yellow during transcription.
 
 First run downloads the Whisper model (~1.5 GB). Subsequent runs start much faster.
 
@@ -206,6 +192,8 @@ TAK has three main stages that run in a loop:
 3. **Transcription & typing** — On Linux, `faster-whisper` transcribes the audio using CUDA on your NVIDIA GPU. On macOS, `mlx-whisper` transcribes using Metal on Apple Silicon. The detected text is injected into the focused window using platform-specific methods (xdotool on Linux, clipboard paste via Cmd+V on macOS).
 
 Transcription runs in a background thread so the key listener stays responsive. If you start a new recording while the previous one is still being transcribed, it waits until the current transcription finishes.
+
+On macOS, a floating pill overlay appears on all connected screens: red while recording, yellow while transcribing. The overlay uses PyObjC (NSPanel) and runs on the main thread via an NSApplication event loop, while pynput runs in a daemon thread.
 
 ## Architecture
 
@@ -275,7 +263,8 @@ tak/                                # Project root
 │   ├── platforms/
 │   │   ├── linux.py                # Linux backend (faster-whisper, PipeWire/ALSA, xdotool)
 │   │   └── macos.py                # macOS backend (mlx-whisper, Core Audio, AppleScript)
-│   └── ui/                         # UI layer (planned)
+│   └── ui/
+│       └── overlay_macos.py        # macOS floating overlay (PyObjC)
 └── .gitignore
 ```
 
