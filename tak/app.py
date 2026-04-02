@@ -144,6 +144,9 @@ class TakApp:
         clipboard_fn: Callable[[str], bool],
         use_clipboard: bool = False,
         platform_label: str = "",
+        on_recording: Optional[Callable[[], None]] = None,
+        on_transcribing: Optional[Callable[[], None]] = None,
+        on_idle: Optional[Callable[[], None]] = None,
     ):
         self.trigger_key = trigger_key
         self.recorder = recorder
@@ -155,6 +158,9 @@ class TakApp:
         self._pressed = False
         self._lock = threading.Lock()
         self._processing = False
+        self._on_recording = on_recording or (lambda: None)
+        self._on_transcribing = on_transcribing or (lambda: None)
+        self._on_idle = on_idle or (lambda: None)
 
     def _on_press(self, key):
         """Handle key press — start recording."""
@@ -164,6 +170,7 @@ class TakApp:
                     return  # still transcribing previous clip
                 self._pressed = True
             self.recorder.start()
+            self._on_recording()
 
     def _on_release(self, key):
         """Handle key release — stop recording, transcribe, type."""
@@ -173,8 +180,10 @@ class TakApp:
 
             if audio is None or len(audio) < WHISPER_RATE * 0.3:
                 warn("Too short — skipped (hold key longer)")
+                self._on_idle()
                 return
 
+            self._on_transcribing()
             # Run transcription in a thread to avoid blocking the key listener
             threading.Thread(target=self._process, args=(audio,), daemon=True).start()
 
@@ -206,9 +215,15 @@ class TakApp:
         finally:
             with self._lock:
                 self._processing = False
+            self._on_idle()
 
-    def run(self):
-        """Start the application."""
+    def run(self, main_loop: Optional[Callable[[], None]] = None):
+        """Start the application.
+
+        If main_loop is provided, the pynput listener runs in a daemon thread
+        and main_loop takes over the main thread (required for GUI event loops
+        on macOS). Otherwise, the listener blocks the main thread directly.
+        """
         banner(self._platform_label)
         key_name = getattr(self.trigger_key, 'name', None) or next(
             (k for k, v in KEY_MAP.items() if v == self.trigger_key), str(self.trigger_key)
@@ -221,14 +236,21 @@ class TakApp:
         print(f"  {C.DIM}Press Ctrl+C to quit.{C.RESET}")
         print()
 
-        with keyboard.Listener(
+        listener = keyboard.Listener(
             on_press=self._on_press,
             on_release=self._on_release,
-        ) as listener:
-            try:
+        )
+        listener.start()
+
+        try:
+            if main_loop:
+                main_loop()
+            else:
                 listener.join()
-            except KeyboardInterrupt:
-                print(f"\n  {C.DIM}Bye! 👋{C.RESET}\n")
+        except KeyboardInterrupt:
+            print(f"\n  {C.DIM}Bye! 👋{C.RESET}\n")
+        finally:
+            listener.stop()
 
 
 # ─── CLI ────────────────────────────────────────────────────────────────

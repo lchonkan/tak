@@ -59,6 +59,15 @@ def main():
         compute_type = "int8" if args.cpu else "float16"
         transcriber = backend.LinuxTranscriber(model_size, device=device, compute_type=compute_type)
 
+    # ── Build overlay (macOS only) ──────────────────────────────
+    overlay = None
+    main_loop = None
+
+    if IS_MACOS:
+        from tak.ui.overlay_macos import MacOverlay, run_app_loop, stop_app_loop
+        overlay = MacOverlay()
+        main_loop = run_app_loop
+
     # ── Build and run app ────────────────────────────────────────
     from tak.app import TakApp
 
@@ -70,8 +79,11 @@ def main():
         clipboard_fn=backend.type_text_clipboard,
         use_clipboard=args.clipboard or IS_MACOS,
         platform_label=backend.get_platform_label(),
+        on_recording=overlay.show_recording if overlay else None,
+        on_transcribing=overlay.show_transcribing if overlay else None,
+        on_idle=overlay.hide if overlay else None,
     )
-    app.run()
+    app.run(main_loop=main_loop)
 
 
 if __name__ == "__main__":
