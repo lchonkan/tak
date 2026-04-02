@@ -8,6 +8,9 @@
 ![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline-blueviolet)
 ![GitHub repo size](https://img.shields.io/github/repo-size/lchonkan/tak)
 ![GitHub last commit](https://img.shields.io/github/last-commit/lchonkan/tak)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/lchonkan?label=Sponsor&logo=github)](https://github.com/sponsors/lchonkan)
+
+**[Website](https://lchonkan.github.io/tak)** | **[Install](#installation)** | **[Sponsor](https://github.com/sponsors/lchonkan)**
 
 Push-to-talk speech-to-text that types anywhere.
 
