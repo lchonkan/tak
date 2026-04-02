@@ -93,7 +93,7 @@ sudo usermod -aG input $USER
 #### 1. Install system dependencies
 
 ```bash
-brew install portaudio
+brew install portaudio ffmpeg
 ```
 
 #### 2. Create the Conda environment
@@ -125,32 +125,37 @@ System Settings → Privacy & Security → Accessibility → add your terminal a
 
 TAK checks for this on startup and will show a clear error if it's missing.
 
-> **Tip:** MacBook keyboards don't have Right Ctrl. Use `--key caps_lock` instead.
-
 ## Quick Start
+
+### Linux
 
 ```bash
 ./run.sh
 ```
 
-First run downloads the Whisper model (~1.5 GB for the default `medium` model). Subsequent runs start much faster.
+Hold **Right Ctrl** → speak → release → text appears at cursor. Press `Ctrl+C` to quit.
 
+### macOS
+
+```bash
+./run.sh
 ```
-Hold Right-Ctrl → Speak → Release → Text appears at cursor
-Press Ctrl+C in terminal to quit
-```
+
+Hold **Right Option** → speak → release → text appears at cursor. Press `Ctrl+C` to quit.
+
+First run downloads the Whisper model (~1.5 GB). Subsequent runs start much faster.
 
 ## Usage
 
 ### Options
 
 ```
-./run.sh --key scroll_lock     # Use a different trigger key
+./run.sh --key caps_lock       # Use a different trigger key
 ./run.sh --model large-v3      # More accurate (uses more VRAM)
 ./run.sh --model small          # Faster, less accurate
 ./run.sh --model tiny           # Fastest, least accurate
-./run.sh --clipboard            # Use Ctrl+V paste instead of simulated typing
-./run.sh --cpu                  # Run on CPU (no GPU required)
+./run.sh --clipboard            # Use clipboard paste (always on for macOS)
+./run.sh --cpu                  # Run on CPU (Linux only, no GPU required)
 ./run.sh --device 2             # Use a specific audio input device
 ```
 
@@ -158,15 +163,26 @@ You can also run directly with Python (after activating the conda env):
 
 ```bash
 conda activate tak
-python -m tak --key ctrl_r --model medium
+python -m tak --model medium
 ```
+
+### Platform defaults
+
+|                  | Linux                  | macOS                    |
+|------------------|------------------------|--------------------------|
+| Trigger key      | `ctrl_r` (Right Ctrl)  | `alt_r` (Right Option)   |
+| Whisper model    | `medium`               | `turbo`                  |
+| Text injection   | Simulated keystrokes   | Clipboard paste (Cmd+V)  |
+| GPU acceleration | CUDA (NVIDIA)          | Metal (Apple Silicon)    |
 
 ### Available trigger keys
 
 ```
-ctrl_r (default), ctrl_l, alt_r, alt_l, shift_r, shift_l,
-scroll_lock, pause, insert, f1–f12, caps_lock
+alt_r (macOS default), ctrl_r (Linux default), ctrl_l, alt_l,
+shift_r, shift_l, scroll_lock, pause, insert, f1–f12, caps_lock
 ```
+
+> **Note:** `scroll_lock`, `pause`, and `insert` are only available on Linux.
 
 ### Model sizes
 
@@ -187,7 +203,7 @@ TAK has three main stages that run in a loop:
 
 1. **Key listener** — `pynput` monitors for the trigger key. On press, recording starts; on release, recording stops.
 2. **Audio recording** — On Linux, captures audio via PipeWire (`pw-record`) or falls back to ALSA via `sounddevice`. On macOS, captures audio via Core Audio through `sounddevice`. Audio is resampled to 16 kHz mono (Whisper's native format). Quiet audio is auto-normalized so Whisper can hear it.
-3. **Transcription & typing** — On Linux, `faster-whisper` transcribes the audio using CUDA on your NVIDIA GPU. On macOS, `mlx-whisper` transcribes using Metal on Apple Silicon. The detected text is typed into the focused window using platform-specific text injection (xdotool on Linux, AppleScript on macOS).
+3. **Transcription & typing** — On Linux, `faster-whisper` transcribes the audio using CUDA on your NVIDIA GPU. On macOS, `mlx-whisper` transcribes using Metal on Apple Silicon. The detected text is injected into the focused window using platform-specific methods (xdotool on Linux, clipboard paste via Cmd+V on macOS).
 
 Transcription runs in a background thread so the key listener stays responsive. If you start a new recording while the previous one is still being transcribed, it waits until the current transcription finishes.
 
@@ -265,7 +281,7 @@ tak/                                # Project root
 
 ## Troubleshooting
 
-### Text doesn't appear in some apps
+### Linux: Text doesn't appear in some apps
 
 Some applications don't accept simulated keystrokes from `xdotool`. Use clipboard mode instead:
 
@@ -273,7 +289,7 @@ Some applications don't accept simulated keystrokes from `xdotool`. Use clipboar
 ./run.sh --clipboard
 ```
 
-### Permission denied / key not detected
+### Linux: Permission denied / key not detected
 
 `pynput` needs access to `/dev/input`. Make sure your user is in the `input` group:
 
@@ -312,14 +328,6 @@ macOS will prompt for microphone access on the first recording attempt. Click "A
 
 ```
 System Settings → Privacy & Security → Microphone
-```
-
-### macOS: No Right Ctrl on MacBook keyboards
-
-MacBook keyboards don't have a Right Ctrl key. Use Caps Lock instead:
-
-```bash
-./run.sh --key caps_lock
 ```
 
 ### PipeWire not available

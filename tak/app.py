@@ -71,30 +71,32 @@ def _resample(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
 
 
 # ─── key name mapping ───────────────────────────────────────────────────
-KEY_MAP = {
-    "ctrl_r":      keyboard.Key.ctrl_r,
-    "ctrl_l":      keyboard.Key.ctrl_l,
-    "alt_r":       keyboard.Key.alt_r,
-    "alt_l":       keyboard.Key.alt_l,
-    "shift_r":     keyboard.Key.shift_r,
-    "shift_l":     keyboard.Key.shift_l,
-    "scroll_lock": keyboard.Key.scroll_lock,
-    "pause":       keyboard.Key.pause,
-    "insert":      keyboard.Key.insert,
-    "f1":          keyboard.Key.f1,
-    "f2":          keyboard.Key.f2,
-    "f3":          keyboard.Key.f3,
-    "f4":          keyboard.Key.f4,
-    "f5":          keyboard.Key.f5,
-    "f6":          keyboard.Key.f6,
-    "f7":          keyboard.Key.f7,
-    "f8":          keyboard.Key.f8,
-    "f9":          keyboard.Key.f9,
-    "f10":         keyboard.Key.f10,
-    "f11":         keyboard.Key.f11,
-    "f12":         keyboard.Key.f12,
-    "caps_lock":   keyboard.Key.caps_lock,
-}
+def _build_key_map() -> dict:
+    """Build key map, skipping keys that don't exist on the current platform."""
+    _entries = [
+        ("ctrl_r",      "ctrl_r"),
+        ("ctrl_l",      "ctrl_l"),
+        ("alt_r",       "alt_r"),
+        ("alt_l",       "alt_l"),
+        ("shift_r",     "shift_r"),
+        ("shift_l",     "shift_l"),
+        ("scroll_lock", "scroll_lock"),
+        ("pause",       "pause"),
+        ("insert",      "insert"),
+        ("f1",  "f1"),  ("f2",  "f2"),  ("f3",  "f3"),  ("f4",  "f4"),
+        ("f5",  "f5"),  ("f6",  "f6"),  ("f7",  "f7"),  ("f8",  "f8"),
+        ("f9",  "f9"),  ("f10", "f10"), ("f11", "f11"), ("f12", "f12"),
+        ("caps_lock",   "caps_lock"),
+    ]
+    kmap = {}
+    for name, attr in _entries:
+        try:
+            kmap[name] = getattr(keyboard.Key, attr)
+        except AttributeError:
+            pass  # key doesn't exist on this platform
+    return kmap
+
+KEY_MAP = _build_key_map()
 
 
 # ─── base classes ────────────────────────────────────────────────────────
@@ -208,7 +210,10 @@ class TakApp:
     def run(self):
         """Start the application."""
         banner(self._platform_label)
-        print(f"  {C.BOLD}Push-to-talk key:{C.RESET}  {C.CYAN}{self.trigger_key.name}{C.RESET}")
+        key_name = getattr(self.trigger_key, 'name', None) or next(
+            (k for k, v in KEY_MAP.items() if v == self.trigger_key), str(self.trigger_key)
+        )
+        print(f"  {C.BOLD}Push-to-talk key:{C.RESET}  {C.CYAN}{key_name}{C.RESET}")
         print(f"  {C.BOLD}Input method:{C.RESET}      {'clipboard paste' if self.use_clipboard else 'simulated keystrokes'}")
         print(f"  {C.BOLD}Languages:{C.RESET}         English · Español (auto-detect)")
         print()
@@ -234,25 +239,25 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m tak                          # Hold Right-Ctrl to talk
+  python -m tak                          # Hold default key to talk
   python -m tak --key scroll_lock        # Use Scroll Lock instead
-  python -m tak --key caps_lock          # Use Caps Lock (good for MacBooks)
+  python -m tak --key caps_lock          # Use Caps Lock
   python -m tak --model large-v3         # More accurate (slower)
   python -m tak --model turbo            # Fast + accurate (macOS default)
   python -m tak --clipboard              # Use clipboard paste
   python -m tak --cpu                    # Run on CPU (no GPU needed)
 
 Available keys:
-  ctrl_r (default), ctrl_l, alt_r, alt_l, shift_r, shift_l,
-  scroll_lock, pause, insert, f1-f12, caps_lock
+  alt_r (macOS default), ctrl_r (Linux default), ctrl_l, alt_l,
+  shift_r, shift_l, scroll_lock, pause, insert, f1-f12, caps_lock
         """,
     )
     parser.add_argument("--key", "-k", default="ctrl_r",
-                        help="Key to hold for push-to-talk (default: ctrl_r)")
+                        help="Key to hold for push-to-talk (default: alt_r on macOS, ctrl_r on Linux)")
     parser.add_argument("--model", "-m", default=None,
                         help="Whisper model size (default: turbo on macOS, medium on Linux)")
     parser.add_argument("--clipboard", "-c", action="store_true",
-                        help="Use clipboard paste instead of simulated typing")
+                        help="Use clipboard paste instead of simulated typing (always on for macOS)")
     parser.add_argument("--cpu", action="store_true",
                         help="Force CPU inference (default: uses CUDA if available)")
     parser.add_argument("--device", "-d", type=int, default=None,

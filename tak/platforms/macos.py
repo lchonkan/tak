@@ -53,9 +53,8 @@ def check_accessibility_permission() -> bool:
 
 # ─── key map adjustments ────────────────────────────────────────────────
 def adjust_key_map():
-    """Remove keys that don't exist on Mac keyboards."""
-    for k in ["scroll_lock", "pause", "insert"]:
-        KEY_MAP.pop(k, None)
+    """Adjust key map for macOS."""
+    pass
 
 
 # ─── WAV writer helper ──────────────────────────────────────────────────
