@@ -12,6 +12,12 @@
 
 **[Website](https://lchonkan.github.io/tak)** | **[Install](#installation)** | **[Sponsor](https://github.com/sponsors/lchonkan)**
 
+<p align="center">
+  <a href="https://lchonkan.github.io/tak">
+    <img src="docs/videos/landing-hero.png" alt="TAK Landing Page" width="800" />
+  </a>
+</p>
+
 Push-to-talk speech-to-text that types anywhere.
 
 Hold a key → speak → release → your words appear wherever you're typing.
