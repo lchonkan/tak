@@ -38,16 +38,16 @@ Funds arrive directly to the maintainer's self-custodial wallet. No intermediary
 Send SOL or any SPL token directly to the maintainer's Solana wallet:
 
 ```
-YOUR_SOLANA_WALLET_ADDRESS
+GWhM8kiCcAKqsNn1WMfyVv1tgTCdz6mGCGWy3UqqHLQx
 ```
 
-> Replace `YOUR_SOLANA_WALLET_ADDRESS` with your actual Solana wallet address (see Part B, Step B.1).
+> Replace `GWhM8kiCcAKqsNn1WMfyVv1tgTCdz6mGCGWy3UqqHLQx` with your actual Solana wallet address (see Part B, Step B.1).
 
 Or scan the QR code:
 
 ![Solana wallet QR code](qr-solana.png)
 
-> Generate `docs/qr-solana.png` using the `solana:YOUR_SOLANA_WALLET_ADDRESS` URI scheme (see Part B, Step B.2).
+> Generate `docs/qr-solana.png` using the `solana:GWhM8kiCcAKqsNn1WMfyVv1tgTCdz6mGCGWy3UqqHLQx` URI scheme (see Part B, Step B.2).
 
 ---
 
