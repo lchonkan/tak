@@ -14,25 +14,6 @@ Donate via **[GitHub Sponsors](https://github.com/sponsors/lchonkan)**.
 
 ---
 
-## Bitcoin · Ethereum · USDC · USDT
-
-Donate via the **[TAK BTCPay Server donation page](https://donations.yourdomain.com/apps/YOUR_APP_ID/crowdfund)**.
-
-> Replace the URL above with your actual BTCPay Crowdfund app URL after deploying BTCPay Server (see TAK_Donation_Implementation_Guide.md, Part B).
-
-Accepted coins:
-
-| Coin | Network |
-|------|---------|
-| BTC | Bitcoin mainnet + Lightning Network |
-| ETH | Ethereum mainnet |
-| USDC | ERC-20 (Ethereum mainnet) |
-| USDT | ERC-20 (Ethereum mainnet) or TRC-20 (TRON) |
-
-Funds arrive directly to the maintainer's self-custodial wallet. No intermediary. No percentage fees beyond blockchain network fees.
-
----
-
 ## Solana (SOL)
 
 Send SOL or any SPL token directly to the maintainer's Solana wallet:

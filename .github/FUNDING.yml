@@ -5,7 +5,3 @@
 # Credit card donations via GitHub Sponsors
 github: lchonkan
 
-# Crypto donations via self-hosted BTCPay Server (Phase 2)
-# Uncomment and replace the URL after BTCPay Server is deployed
-# custom:
-#   - "https://donations.yourdomain.com/apps/YOUR_APP_ID/crowdfund"
