@@ -32,7 +32,6 @@ TAK is free and open source (MIT). If it makes your workflow faster, consider su
 | Method | Details |
 |--------|---------|
 | **Credit card** | [Sponsor on GitHub](https://github.com/sponsors/lchonkan) — no fees, recurring or one-time |
-| **BTC / ETH / USDC / USDT** | [Donate via BTCPay Server](https://donations.yourdomain.com/apps/YOUR_APP_ID/crowdfund) — self-custodial, no intermediary |
 | **Solana (SOL)** | `GWhM8kiCcAKqsNn1WMfyVv1tgTCdz6mGCGWy3UqqHLQx` |
 
 All crypto goes directly to the maintainer's wallets. Full details: [docs/donations.md](docs/donations.md)
