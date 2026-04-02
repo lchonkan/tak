@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TAK — Talk to Keyboard</title>
+  <meta name="description" content="Push-to-talk speech-to-text. Hold a key, speak, release — your words appear wherever you're typing. 100% offline, GPU-accelerated, open source." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Three.js Canvas -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Navigation -->
+  <nav id="navbar">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <span class="logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </span>
+        <span class="logo-text">TAK</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#platforms">Platforms</a>
+        <a href="#install">Install</a>
+        <a href="#docs">Docs</a>
+        <a href="https://github.com/lchonkan/tak" class="nav-github" target="_blank" rel="noopener">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        </a>
+      </div>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobile-menu">
+    <a href="#features">Features</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#platforms">Platforms</a>
+    <a href="#install">Install</a>
+    <a href="#docs">Docs</a>
+    <a href="https://github.com/lchonkan/tak" target="_blank" rel="noopener">GitHub</a>
+  </div>
+
+  <!-- Hero -->
+  <section id="hero">
+    <div class="hero-content">
+      <div class="hero-badge">Open Source &middot; MIT License</div>
+      <h1>
+        <span class="hero-line">Talk to</span>
+        <span class="hero-line hero-accent">Keyboard</span>
+      </h1>
+      <p class="hero-sub">
+        Hold a key. Speak. Release.<br />
+        Your words appear wherever you're typing.
+      </p>
+      <p class="hero-desc">
+        100% offline speech-to-text powered by Whisper. GPU-accelerated on CUDA and Metal.
+        Works in any application. No cloud, no API keys, no latency.
+      </p>
+      <div class="hero-actions">
+        <a href="#install" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Install
+        </a>
+        <a href="https://github.com/lchonkan/tak" class="btn btn-secondary" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="stat-value">2</span>
+          <span class="stat-label">Platforms</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-value">6</span>
+          <span class="stat-label">Whisper Models</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-value">0</span>
+          <span class="stat-label">Cloud Calls</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Terminal Demo -->
+  <section id="demo">
+    <div class="container">
+      <div class="terminal" data-animate>
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+          </div>
+          <span class="terminal-title">tak &mdash; zsh</span>
+        </div>
+        <div class="terminal-body">
+          <pre><code><span class="t-prompt">$</span> <span class="t-cmd">./run.sh</span>
+
+<span class="t-cyan">╔══════════════════════════════════════════════╗</span>
+<span class="t-cyan">║</span>   <span class="t-bold t-white">TAK — Talk to Keyboard</span>                   <span class="t-cyan">║</span>
+<span class="t-cyan">║</span>   <span class="t-dim">Push-to-talk speech-to-text</span>               <span class="t-cyan">║</span>
+<span class="t-cyan">╚══════════════════════════════════════════════╝</span>
+
+<span class="t-dim">Platform:</span>     <span class="t-green">macOS (Apple Silicon, Metal GPU)</span>
+<span class="t-dim">Model:</span>        <span class="t-white">mlx-community/whisper-turbo</span>
+<span class="t-dim">Trigger key:</span>  <span class="t-yellow">Right Option (⌥)</span>
+<span class="t-dim">Input mode:</span>   <span class="t-white">Clipboard paste (⌘V)</span>
+
+<span class="t-green">✓ Model loaded</span>  <span class="t-dim">Ready — hold</span> <span class="t-yellow">Right Option</span> <span class="t-dim">and speak</span>
+
+<span class="t-red">● Recording…</span>   <span class="t-dim">1.4s</span>
+<span class="t-yellow">◉ Transcribing…</span>
+<span class="t-green">✓ Typed:</span> <span class="t-white">"Hello, this is a demo of TAK."</span>  <span class="t-dim">0.3s</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="container">
+      <div class="section-header" data-animate>
+        <span class="section-tag">Features</span>
+        <h2>Everything you need,<br />nothing you don't</h2>
+        <p class="section-desc">TAK is designed to do one thing exceptionally well: turn your voice into text, instantly, privately, and everywhere.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card" data-animate>
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h3>100% Offline</h3>
+          <p>All transcription happens locally on your machine. No cloud APIs, no data leaving your computer, no internet required.</p>
+        </div>
+        <div class="feature-card" data-animate>
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <h3>GPU Accelerated</h3>
+          <p>Blazing fast inference with CUDA on Linux (NVIDIA) and Metal on macOS (Apple Silicon). CPU fallback available.</p>
+        </div>
+        <div class="feature-card" data-animate>
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <h3>System-Wide</h3>
+          <p>Works in any application with a text cursor — browsers, editors, terminals, Slack, email, everywhere.</p>
+        </div>
+        <div class="feature-card" data-animate>
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </div>
+          <h3>Push-to-Talk</h3>
+          <p>Microphone only active while you hold the trigger key. No always-on listening, no accidental recordings.</p>
+        </div>
+        <div class="feature-card" data-animate>
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <h3>Bilingual</h3>
+          <p>Auto-detects English and Spanish. Seamlessly switch languages mid-conversation without configuration.</p>
+        </div>
+        <div class="feature-card" data-animate>
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </div>
+          <h3>Configurable</h3>
+          <p>Choose your trigger key, model size, input method, and audio device. Tune the balance of speed vs. accuracy.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section id="how-it-works">
+    <div class="container">
+      <div class="section-header" data-animate>
+        <span class="section-tag">How It Works</span>
+        <h2>Three stages, one keystroke</h2>
+        <p class="section-desc">TAK runs a tight loop: listen, transcribe, type. The entire pipeline completes in under a second.</p>
+      </div>
+      <div class="pipeline">
+        <div class="pipeline-step" data-animate>
+          <div class="step-number">01</div>
+          <div class="step-content">
+            <h3>Record</h3>
+            <p>Hold the trigger key. TAK captures audio from your microphone via Core Audio (macOS) or PipeWire/ALSA (Linux). Audio is resampled to 16 kHz mono and auto-normalized.</p>
+            <div class="step-tech">
+              <span class="tech-tag">pynput</span>
+              <span class="tech-tag">sounddevice</span>
+              <span class="tech-tag">Core Audio</span>
+              <span class="tech-tag">PipeWire</span>
+            </div>
+          </div>
+          <div class="step-visual">
+            <div class="waveform">
+              <div class="wave-bar" style="--h: 20%"></div>
+              <div class="wave-bar" style="--h: 45%"></div>
+              <div class="wave-bar" style="--h: 70%"></div>
+              <div class="wave-bar" style="--h: 90%"></div>
+              <div class="wave-bar" style="--h: 100%"></div>
+              <div class="wave-bar" style="--h: 85%"></div>
+              <div class="wave-bar" style="--h: 60%"></div>
+              <div class="wave-bar" style="--h: 40%"></div>
+              <div class="wave-bar" style="--h: 75%"></div>
+              <div class="wave-bar" style="--h: 95%"></div>
+              <div class="wave-bar" style="--h: 65%"></div>
+              <div class="wave-bar" style="--h: 30%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step" data-animate>
+          <div class="step-number">02</div>
+          <div class="step-content">
+            <h3>Transcribe</h3>
+            <p>On key release, Whisper runs inference on your GPU. Voice activity detection filters silence. Language detection handles bilingual input automatically.</p>
+            <div class="step-tech">
+              <span class="tech-tag">OpenAI Whisper</span>
+              <span class="tech-tag">faster-whisper</span>
+              <span class="tech-tag">mlx-whisper</span>
+              <span class="tech-tag">Silero VAD</span>
+            </div>
+          </div>
+          <div class="step-visual">
+            <div class="transcribe-anim">
+              <div class="pulse-ring"></div>
+              <div class="pulse-ring pulse-ring-2"></div>
+              <div class="pulse-core">AI</div>
+            </div>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step" data-animate>
+          <div class="step-number">03</div>
+          <div class="step-content">
+            <h3>Type</h3>
+            <p>Transcribed text is injected into the focused window via simulated keystrokes (Linux) or clipboard paste (macOS). It just appears where your cursor is.</p>
+            <div class="step-tech">
+              <span class="tech-tag">xdotool</span>
+              <span class="tech-tag">AppleScript</span>
+              <span class="tech-tag">Clipboard</span>
+            </div>
+          </div>
+          <div class="step-visual">
+            <div class="type-anim">
+              <span class="typed-text"></span>
+              <span class="cursor-blink">|</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section id="architecture">
+    <div class="container">
+      <div class="section-header" data-animate>
+        <span class="section-tag">Architecture</span>
+        <h2>Modular by design</h2>
+        <p class="section-desc">TAK uses dependency injection with platform-specific backends. The core is platform-agnostic — backends are pluggable.</p>
+      </div>
+      <div class="arch-diagram" data-animate>
+        <div class="arch-layer arch-entry">
+          <div class="arch-label">Entry Point</div>
+          <div class="arch-box arch-box-entry">
+            <code>__main__.py</code>
+            <span>Platform detection &amp; dependency injection</span>
+          </div>
+        </div>
+        <div class="arch-arrow">
+          <svg width="24" height="40" viewBox="0 0 24 40"><path d="M12 0 L12 30 L6 24 M12 30 L18 24" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+        </div>
+        <div class="arch-layer arch-core">
+          <div class="arch-label">Shared Core</div>
+          <div class="arch-box arch-box-core">
+            <code>app.py</code>
+            <span>TakApp, base classes, CLI, audio utilities</span>
+            <div class="arch-components">
+              <span class="arch-component">TakApp</span>
+              <span class="arch-component">BaseAudioRecorder</span>
+              <span class="arch-component">BaseTranscriber</span>
+              <span class="arch-component">parse_args()</span>
+              <span class="arch-component">_resample()</span>
+              <span class="arch-component">KEY_MAP</span>
+            </div>
+          </div>
+        </div>
+        <div class="arch-arrow">
+          <svg width="24" height="40" viewBox="0 0 24 40"><path d="M12 0 L12 30 L6 24 M12 30 L18 24" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+        </div>
+        <div class="arch-layer arch-platforms">
+          <div class="arch-label">Platform Backends</div>
+          <div class="arch-split">
+            <div class="arch-box arch-box-linux">
+              <div class="arch-box-header">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.311.004-.466.014-.817.054-1.573.315-2.198.77a4.07 4.07 0 0 0-1.433 1.822c-.354.787-.514 1.648-.482 2.548.018.505.095 1.003.24 1.472-.616.39-1.1.88-1.435 1.463-.34.594-.518 1.256-.518 1.911 0 .793.262 1.548.747 2.124-.287.4-.49.835-.607 1.29-.139.54-.159 1.1-.059 1.654.101.554.313 1.068.619 1.524a4.396 4.396 0 0 0 1.152 1.171c-.205.503-.299 1.04-.283 1.583a3.822 3.822 0 0 0 .427 1.703c.312.567.758 1.044 1.303 1.381.544.338 1.165.528 1.813.555h.063c.636 0 1.248-.177 1.78-.51.533-.334.965-.813 1.261-1.39.298-.576.453-1.21.453-1.852 0-.543-.112-1.077-.332-1.57a4.397 4.397 0 0 0 1.136-1.167c.305-.455.516-.968.616-1.522.1-.553.08-1.114-.059-1.654a3.617 3.617 0 0 0-.607-1.29c.485-.576.747-1.331.747-2.124 0-.655-.178-1.317-.518-1.911-.336-.583-.82-1.073-1.435-1.463.145-.469.222-.967.24-1.472.032-.9-.128-1.761-.482-2.548A4.07 4.07 0 0 0 15.168.784a4.093 4.093 0 0 0-2.198-.77A7.37 7.37 0 0 0 12.504 0z"/></svg>
+                <strong>Linux</strong>
+              </div>
+              <code>platforms/linux.py</code>
+              <div class="arch-stack">
+                <span>LinuxAudioRecorder</span>
+                <span>LinuxTranscriber</span>
+                <span>faster-whisper + CUDA</span>
+                <span>xdotool / xclip</span>
+              </div>
+            </div>
+            <div class="arch-box arch-box-macos">
+              <div class="arch-box-header">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                <strong>macOS</strong>
+              </div>
+              <code>platforms/macos.py</code>
+              <div class="arch-stack">
+                <span>MacAudioRecorder</span>
+                <span>MacTranscriber</span>
+                <span>mlx-whisper + Metal</span>
+                <span>AppleScript / pbcopy</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="arch-principles" data-animate>
+        <div class="principle">
+          <div class="principle-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div>
+            <strong>Zero platform branching in core</strong>
+            <p>All <code>if IS_MACOS</code> logic lives in <code>__main__.py</code> only</p>
+          </div>
+        </div>
+        <div class="principle">
+          <div class="principle-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div>
+            <strong>Constructor injection</strong>
+            <p>TakApp receives backends as arguments — never imports platform modules</p>
+          </div>
+        </div>
+        <div class="principle">
+          <div class="principle-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div>
+            <strong>Self-contained backends</strong>
+            <p>Deleting <code>linux.py</code> on macOS causes zero errors, and vice versa</p>
+          </div>
+        </div>
+        <div class="principle">
+          <div class="principle-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div>
+            <strong>Lazy imports for heavy deps</strong>
+            <p><code>faster_whisper</code> and <code>mlx_whisper</code> imported inside <code>__init__()</code></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Platforms -->
+  <section id="platforms">
+    <div class="container">
+      <div class="section-header" data-animate>
+        <span class="section-tag">Cross-Platform</span>
+        <h2>One app, two stacks</h2>
+        <p class="section-desc">Each platform uses the best native tooling available — no lowest-common-denominator compromises.</p>
+      </div>
+      <div class="platform-compare" data-animate>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M12.504 0c-.155 0-.311.004-.466.014-.817.054-1.573.315-2.198.77a4.07 4.07 0 0 0-1.433 1.822c-.354.787-.514 1.648-.482 2.548.018.505.095 1.003.24 1.472-.616.39-1.1.88-1.435 1.463-.34.594-.518 1.256-.518 1.911 0 .793.262 1.548.747 2.124-.287.4-.49.835-.607 1.29-.139.54-.159 1.1-.059 1.654.101.554.313 1.068.619 1.524a4.396 4.396 0 0 0 1.152 1.171c-.205.503-.299 1.04-.283 1.583a3.822 3.822 0 0 0 .427 1.703c.312.567.758 1.044 1.303 1.381.544.338 1.165.528 1.813.555h.063c.636 0 1.248-.177 1.78-.51.533-.334.965-.813 1.261-1.39.298-.576.453-1.21.453-1.852 0-.543-.112-1.077-.332-1.57a4.397 4.397 0 0 0 1.136-1.167c.305-.455.516-.968.616-1.522.1-.553.08-1.114-.059-1.654a3.617 3.617 0 0 0-.607-1.29c.485-.576.747-1.331.747-2.124 0-.655-.178-1.317-.518-1.911-.336-.583-.82-1.073-1.435-1.463.145-.469.222-.967.24-1.472.032-.9-.128-1.761-.482-2.548A4.07 4.07 0 0 0 15.168.784a4.093 4.093 0 0 0-2.198-.77A7.37 7.37 0 0 0 12.504 0z"/></svg>
+                Linux
+              </th>
+              <th>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                macOS
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>GPU</td>
+              <td>NVIDIA CUDA</td>
+              <td>Apple Metal</td>
+            </tr>
+            <tr>
+              <td>Inference</td>
+              <td>CTranslate2 (float16)</td>
+              <td>MLX Framework</td>
+            </tr>
+            <tr>
+              <td>ASR Engine</td>
+              <td>faster-whisper</td>
+              <td>mlx-whisper</td>
+            </tr>
+            <tr>
+              <td>Default Model</td>
+              <td><code>medium</code></td>
+              <td><code>turbo</code></td>
+            </tr>
+            <tr>
+              <td>Audio Input</td>
+              <td>PipeWire / ALSA</td>
+              <td>Core Audio</td>
+            </tr>
+            <tr>
+              <td>Text Output</td>
+              <td>xdotool / xclip</td>
+              <td>AppleScript / pbcopy</td>
+            </tr>
+            <tr>
+              <td>Default Key</td>
+              <td><kbd>Right Ctrl</kbd></td>
+              <td><kbd>Right Option</kbd></td>
+            </tr>
+            <tr>
+              <td>Precision</td>
+              <td>float16 / int8</td>
+              <td>MLX default</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Model Sizes -->
+      <div class="section-header section-header-sub" data-animate>
+        <h3>Whisper model sizes</h3>
+        <p class="section-desc">Trade off speed and accuracy. Larger models are slower but more precise.</p>
+      </div>
+      <div class="models-grid" data-animate>
+        <div class="model-card">
+          <div class="model-name">tiny</div>
+          <div class="model-meta">~1 GB &middot; Fastest</div>
+          <div class="model-bar"><div class="model-bar-fill" style="--w: 20%"></div></div>
+        </div>
+        <div class="model-card">
+          <div class="model-name">base</div>
+          <div class="model-meta">~1 GB &middot; Fast</div>
+          <div class="model-bar"><div class="model-bar-fill" style="--w: 35%"></div></div>
+        </div>
+        <div class="model-card">
+          <div class="model-name">small</div>
+          <div class="model-meta">~2 GB &middot; Moderate</div>
+          <div class="model-bar"><div class="model-bar-fill" style="--w: 50%"></div></div>
+        </div>
+        <div class="model-card">
+          <div class="model-name">medium</div>
+          <div class="model-meta">~5 GB &middot; Slower</div>
+          <div class="model-bar"><div class="model-bar-fill" style="--w: 70%"></div></div>
+          <span class="model-badge">Linux Default</span>
+        </div>
+        <div class="model-card">
+          <div class="model-name">turbo</div>
+          <div class="model-meta">~2 GB &middot; Fast</div>
+          <div class="model-bar"><div class="model-bar-fill" style="--w: 75%"></div></div>
+          <span class="model-badge model-badge-accent">macOS Default</span>
+        </div>
+        <div class="model-card">
+          <div class="model-name">large-v3</div>
+          <div class="model-meta">~6 GB &middot; Slowest</div>
+          <div class="model-bar"><div class="model-bar-fill" style="--w: 100%"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Installation -->
+  <section id="install">
+    <div class="container">
+      <div class="section-header" data-animate>
+        <span class="section-tag">Get Started</span>
+        <h2>Up and running in 60 seconds</h2>
+      </div>
+      <div class="install-tabs" data-animate>
+        <div class="tab-bar">
+          <button class="tab active" data-tab="quick">Quick Install</button>
+          <button class="tab" data-tab="macos">macOS Manual</button>
+          <button class="tab" data-tab="linux">Linux Manual</button>
+        </div>
+        <div class="tab-content active" id="tab-quick">
+          <div class="code-block">
+            <div class="code-header">
+              <span>Terminal</span>
+              <button class="copy-btn" data-copy="git clone https://github.com/lchonkan/tak.git && cd tak && ./install.sh">Copy</button>
+            </div>
+            <pre><code><span class="t-prompt">$</span> git clone https://github.com/lchonkan/tak.git
+<span class="t-prompt">$</span> cd tak
+<span class="t-prompt">$</span> ./install.sh</code></pre>
+          </div>
+          <p class="install-note">The installer auto-detects your platform, installs dependencies, creates the conda environment, and sets permissions.</p>
+          <div class="code-block">
+            <div class="code-header">
+              <span>Run</span>
+            </div>
+            <pre><code><span class="t-prompt">$</span> ./run.sh</code></pre>
+          </div>
+        </div>
+        <div class="tab-content" id="tab-macos">
+          <div class="code-block">
+            <div class="code-header"><span>Terminal</span></div>
+            <pre><code><span class="t-comment"># Install system dependencies</span>
+<span class="t-prompt">$</span> brew install portaudio
+
+<span class="t-comment"># Clone and set up</span>
+<span class="t-prompt">$</span> git clone https://github.com/lchonkan/tak.git && cd tak
+<span class="t-prompt">$</span> conda create -n tak python=3.11 -y
+<span class="t-prompt">$</span> conda activate tak
+<span class="t-prompt">$</span> pip install -r requirements-macos.txt
+
+<span class="t-comment"># Grant Accessibility permission</span>
+<span class="t-comment"># System Settings → Privacy & Security → Accessibility → Terminal</span>
+
+<span class="t-comment"># Run</span>
+<span class="t-prompt">$</span> ./run.sh</code></pre>
+          </div>
+        </div>
+        <div class="tab-content" id="tab-linux">
+          <div class="code-block">
+            <div class="code-header"><span>Terminal</span></div>
+            <pre><code><span class="t-comment"># Install system dependencies</span>
+<span class="t-prompt">$</span> sudo apt install xdotool xclip libportaudio2
+
+<span class="t-comment"># Clone and set up</span>
+<span class="t-prompt">$</span> git clone https://github.com/lchonkan/tak.git && cd tak
+<span class="t-prompt">$</span> conda create -n tak python=3.11 -y
+<span class="t-prompt">$</span> conda activate tak
+<span class="t-prompt">$</span> pip install -r requirements-linux.txt
+
+<span class="t-comment"># Grant input device access</span>
+<span class="t-prompt">$</span> sudo usermod -aG input $USER
+<span class="t-comment"># Log out and back in</span>
+
+<span class="t-comment"># Run</span>
+<span class="t-prompt">$</span> ./run.sh</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configuration -->
+      <div class="section-header section-header-sub" data-animate>
+        <h3>Configuration</h3>
+      </div>
+      <div class="config-grid" data-animate>
+        <div class="config-item">
+          <code>./run.sh --key caps_lock</code>
+          <span>Use Caps Lock as trigger</span>
+        </div>
+        <div class="config-item">
+          <code>./run.sh --model large-v3</code>
+          <span>Maximum accuracy</span>
+        </div>
+        <div class="config-item">
+          <code>./run.sh --model tiny</code>
+          <span>Maximum speed</span>
+        </div>
+        <div class="config-item">
+          <code>./run.sh --clipboard</code>
+          <span>Paste via clipboard</span>
+        </div>
+        <div class="config-item">
+          <code>./run.sh --cpu</code>
+          <span>CPU-only mode</span>
+        </div>
+        <div class="config-item">
+          <code>./run.sh --device 2</code>
+          <span>Specific audio device</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Threading Model -->
+  <section id="threading">
+    <div class="container">
+      <div class="section-header" data-animate>
+        <span class="section-tag">Under the Hood</span>
+        <h2>Threading model</h2>
+        <p class="section-desc">TAK uses three threads to keep the key listener responsive while transcription runs in the background.</p>
+      </div>
+      <div class="threading-diagram" data-animate>
+        <div class="thread-row">
+          <div class="thread-label">Main Thread</div>
+          <div class="thread-bar thread-main">
+            <span class="thread-segment thread-seg-init">Init</span>
+            <span class="thread-segment thread-seg-run">app.run() — keyboard listener loop</span>
+          </div>
+        </div>
+        <div class="thread-row">
+          <div class="thread-label">Listener Thread</div>
+          <div class="thread-bar thread-listener">
+            <span class="thread-segment thread-seg-gap"></span>
+            <span class="thread-segment thread-seg-press">on_press</span>
+            <span class="thread-segment thread-seg-rec">Recording</span>
+            <span class="thread-segment thread-seg-release">on_release</span>
+          </div>
+        </div>
+        <div class="thread-row">
+          <div class="thread-label">Worker Thread</div>
+          <div class="thread-bar thread-worker">
+            <span class="thread-segment thread-seg-gap2"></span>
+            <span class="thread-segment thread-seg-transcribe">Transcribe</span>
+            <span class="thread-segment thread-seg-type">Type</span>
+          </div>
+        </div>
+      </div>
+      <p class="threading-note" data-animate>A threading lock ensures only one transcription runs at a time. New key presses during transcription are queued.</p>
+    </div>
+  </section>
+
+  <!-- Docs -->
+  <section id="docs">
+    <div class="container">
+      <div class="section-header" data-animate>
+        <span class="section-tag">Documentation</span>
+        <h2>Learn more</h2>
+      </div>
+      <div class="docs-grid" data-animate>
+        <a href="https://github.com/lchonkan/tak/blob/main/README.md" class="doc-card" target="_blank" rel="noopener">
+          <div class="doc-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <h4>README</h4>
+          <p>Installation, usage, configuration, and troubleshooting.</p>
+        </a>
+        <a href="https://github.com/lchonkan/tak/blob/main/docs/architecture.md" class="doc-card" target="_blank" rel="noopener">
+          <div class="doc-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          </div>
+          <h4>Architecture</h4>
+          <p>System diagrams, class hierarchy, sequence diagrams, and threading model.</p>
+        </a>
+        <a href="https://github.com/lchonkan/tak/blob/main/docs/platform-architecture.md" class="doc-card" target="_blank" rel="noopener">
+          <div class="doc-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </div>
+          <h4>Platform Stack</h4>
+          <p>Full hardware-to-app comparison between Linux and macOS backends.</p>
+        </a>
+        <a href="https://github.com/lchonkan/tak/blob/main/CONTRIBUTING.md" class="doc-card" target="_blank" rel="noopener">
+          <div class="doc-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <h4>Contributing</h4>
+          <p>Git Flow workflow, commit conventions, branch naming, and development setup.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="logo-text">TAK</span>
+          <p>Talk to Keyboard &mdash; open-source push-to-talk speech-to-text.</p>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <h5>Project</h5>
+            <a href="https://github.com/lchonkan/tak" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://github.com/lchonkan/tak/releases" target="_blank" rel="noopener">Releases</a>
+            <a href="https://github.com/lchonkan/tak/issues" target="_blank" rel="noopener">Issues</a>
+          </div>
+          <div class="footer-col">
+            <h5>Docs</h5>
+            <a href="https://github.com/lchonkan/tak/blob/main/README.md" target="_blank" rel="noopener">README</a>
+            <a href="https://github.com/lchonkan/tak/blob/main/docs/architecture.md" target="_blank" rel="noopener">Architecture</a>
+            <a href="https://github.com/lchonkan/tak/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
+          </div>
+          <div class="footer-col">
+            <h5>Legal</h5>
+            <a href="https://github.com/lchonkan/tak/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>Made with care. 100% offline. 100% open source.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+    }
+  }
+  </script>
+  <script type="module" src="scene.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
