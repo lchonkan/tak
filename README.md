@@ -52,6 +52,18 @@ Works in any application — terminals, browsers, editors, chat apps, anything w
 
 ## Installation
 
+### Quick Install (macOS and Linux)
+
+```bash
+git clone https://github.com/lchonkan/tak.git
+cd tak
+./install.sh
+```
+
+The installer automatically detects your platform, installs system dependencies, creates a conda environment, and verifies the setup.
+
+### Manual Install
+
 ### Linux
 
 #### 1. Install system dependencies
