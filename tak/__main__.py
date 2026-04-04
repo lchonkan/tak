@@ -59,17 +59,36 @@ def main():
         compute_type = "int8" if args.cpu else "float16"
         transcriber = backend.LinuxTranscriber(model_size, device=device, compute_type=compute_type)
 
-    # ── Build overlay (macOS only) ──────────────────────────────
+    # ── Build UI (macOS only) ────────────────────────────────────
     overlay = None
+    menubar = None
     main_loop = None
 
     if IS_MACOS:
         from tak.ui.overlay_macos import MacOverlay, run_app_loop, stop_app_loop
+        from tak.ui.menubar_macos import MacMenuBar
         overlay = MacOverlay()
+        menubar = MacMenuBar.alloc().init()
         main_loop = run_app_loop
+
+    def _combine(*fns):
+        """Combine multiple callbacks into one."""
+        def _call():
+            for fn in fns:
+                fn()
+        return _call
 
     # ── Build and run app ────────────────────────────────────────
     from tak.app import TakApp
+
+    on_recording = None
+    on_transcribing = None
+    on_idle = None
+
+    if overlay and menubar:
+        on_recording = _combine(overlay.show_recording, menubar.set_recording)
+        on_transcribing = _combine(overlay.show_transcribing, menubar.set_transcribing)
+        on_idle = _combine(overlay.hide, menubar.set_idle)
 
     app = TakApp(
         trigger_key=trigger_key,
@@ -79,9 +98,9 @@ def main():
         clipboard_fn=backend.type_text_clipboard,
         use_clipboard=args.clipboard or IS_MACOS,
         platform_label=backend.get_platform_label(),
-        on_recording=overlay.show_recording if overlay else None,
-        on_transcribing=overlay.show_transcribing if overlay else None,
-        on_idle=overlay.hide if overlay else None,
+        on_recording=on_recording,
+        on_transcribing=on_transcribing,
+        on_idle=on_idle,
     )
     app.run(main_loop=main_loop)
 
