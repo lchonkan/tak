@@ -60,6 +60,18 @@ def save_config(config: TakConfig) -> None:
     )
 
 
+# ─── Trigger key options ──────────────────────────────────────────────
+
+_TRIGGER_KEYS = [
+    ("alt_r",   "Right Option (⌥)"),
+    ("shift_r", "Right Shift (⇧)"),
+    ("cmd_r",   "Right Command (⌘)"),
+]
+
+_TRIGGER_KEY_IDS = [k for k, _ in _TRIGGER_KEYS]
+_TRIGGER_KEY_LABELS = [v for _, v in _TRIGGER_KEYS]
+
+
 # ─── Model display names ───────────────────────────────────────────────
 
 _MODEL_INFO = {
@@ -72,16 +84,139 @@ _MODEL_INFO = {
 }
 
 
+# ─── Keyboard visualization ──────────────────────────────────────────
+
+# Key layout for the bottom two rows of a Mac keyboard.
+# Each key: (label, x, y, w, h, key_id_or_None)
+_KEY_H = 26
+_GAP = 2
+_KB_W = 380
+_KB_H = _KEY_H * 2 + _GAP
+
+def _keyboard_keys():
+    """Return list of (label, x, y, w, h, key_id) for keyboard drawing."""
+    keys = []
+    y1 = _KEY_H + _GAP   # shift row (top)
+    y0 = 0                # modifier row (bottom)
+
+    # ── Shift row ───────────────────────────────────────────────
+    x = 0
+    def _add(label, w, key_id=None, y=y1):
+        nonlocal x
+        keys.append((label, x, y, w, _KEY_H, key_id))
+        x += w + _GAP
+
+    _add("⇧", 54)
+    for ch in "ZXCVBNM":
+        _add(ch, 24)
+    _add(",", 24); _add(".", 24); _add("/", 24)
+    # Right Shift fills remaining space
+    rshift_w = _KB_W - x
+    keys.append(("⇧ shift", x, y1, rshift_w, _KEY_H, "shift_r"))
+
+    # ── Modifier row ────────────────────────────────────────────
+    x = 0
+    def _add2(label, w, key_id=None):
+        nonlocal x
+        keys.append((label, x, y0, w, _KEY_H, key_id))
+        x += w + _GAP
+
+    _add2("fn", 30)
+    _add2("⌃", 30)
+    _add2("⌥", 36)
+    _add2("⌘", 44)
+    # Space
+    space_w = 120
+    _add2("", space_w)
+    # Right Command
+    _add2("⌘", 44, "cmd_r")
+    # Right Option fills to end
+    ropt_w = _KB_W - x
+    keys.append(("⌥ option", x, y0, ropt_w, _KEY_H, "alt_r"))
+
+    return keys
+
+_KEYBOARD_KEYS = _keyboard_keys()
+
+_HIGHLIGHT = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(
+    0.25, 0.52, 0.96, 1.0
+)
+_KEY_BG = AppKit.NSColor.colorWithCalibratedWhite_alpha_(0.22, 1.0)
+_KEY_BORDER = AppKit.NSColor.colorWithCalibratedWhite_alpha_(0.35, 1.0)
+
+
+class KeyboardView(AppKit.NSView):
+    """Custom NSView that draws a keyboard and highlights the selected key."""
+
+    _selected_key = objc.ivar()
+
+    def initWithFrame_(self, frame):
+        self = objc.super(KeyboardView, self).initWithFrame_(frame)
+        if self is None:
+            return None
+        self._selected_key = "alt_r"
+        return self
+
+    def setSelectedKey_(self, key_id):
+        self._selected_key = key_id
+        self.setNeedsDisplay_(True)
+
+    def isFlipped(self):
+        return False
+
+    def drawRect_(self, dirty):
+        for label, kx, ky, kw, kh, key_id in _KEYBOARD_KEYS:
+            rect = Foundation.NSMakeRect(kx, ky, kw, kh)
+            path = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+                rect, 4, 4
+            )
+
+            # Fill
+            if key_id and key_id == self._selected_key:
+                _HIGHLIGHT.set()
+            else:
+                _KEY_BG.set()
+            path.fill()
+
+            # Border
+            _KEY_BORDER.set()
+            path.setLineWidth_(0.5)
+            path.stroke()
+
+            # Label
+            if key_id and key_id == self._selected_key:
+                color = AppKit.NSColor.whiteColor()
+            else:
+                color = AppKit.NSColor.labelColor()
+
+            font = AppKit.NSFont.systemFontOfSize_(10)
+            attrs = {
+                AppKit.NSFontAttributeName: font,
+                AppKit.NSForegroundColorAttributeName: color,
+            }
+            text = Foundation.NSAttributedString.alloc().initWithString_attributes_(
+                label, attrs
+            )
+            text_size = text.size()
+            tx = kx + (kw - text_size.width) / 2
+            ty = ky + (kh - text_size.height) / 2
+            text.drawAtPoint_(Foundation.NSMakePoint(tx, ty))
+
+
 # ─── Preferences window ────────────────────────────────────────────────
 
-class SettingsWindow:
+class SettingsWindow(AppKit.NSObject):
     """macOS preferences window backed by NSUserDefaults."""
 
-    def __init__(self):
+    def init(self):
+        self = objc.super(SettingsWindow, self).init()
+        if self is None:
+            return None
         self._window: Optional[AppKit.NSWindow] = None
+        return self
 
     def _build(self):
-        w, h = 420, 280
+        w, h = 420, 360
         rect = Foundation.NSMakeRect(0, 0, w, h)
 
         self._window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -110,17 +245,29 @@ class SettingsWindow:
         self._key_popup = AppKit.NSPopUpButton.alloc().initWithFrame_pullsDown_(
             Foundation.NSMakeRect(control_x, y - 4, control_w, 26), False
         )
-        from tak.app import KEY_MAP
-        key_names = sorted(KEY_MAP.keys())
-        for name in key_names:
-            self._key_popup.addItemWithTitle_(name)
-        if config.trigger_key in key_names:
-            self._key_popup.selectItemWithTitle_(config.trigger_key)
+        for label in _TRIGGER_KEY_LABELS:
+            self._key_popup.addItemWithTitle_(label)
+        # Select current
+        if config.trigger_key in _TRIGGER_KEY_IDS:
+            idx = _TRIGGER_KEY_IDS.index(config.trigger_key)
+            self._key_popup.selectItemAtIndex_(idx)
         self._key_popup.setTarget_(self)
         self._key_popup.setAction_("onSettingChanged:")
         content.addSubview_(self._key_popup)
 
-        y -= 44
+        y -= 36
+
+        # ── Keyboard visualization ──────────────────────────────────
+        kb_x = label_x
+        kb_w = _KB_W
+        kb_h = _KB_H
+        self._keyboard = KeyboardView.alloc().initWithFrame_(
+            Foundation.NSMakeRect(kb_x, y - kb_h, kb_w, kb_h)
+        )
+        self._keyboard.setSelectedKey_(config.trigger_key)
+        content.addSubview_(self._keyboard)
+
+        y -= kb_h + 20
 
         # ── Whisper Model ───────────────────────────────────────────
         self._add_label(content, "Whisper Model:", label_x, y)
@@ -130,7 +277,6 @@ class SettingsWindow:
         model_keys = list(_MODEL_INFO.keys())
         for key in model_keys:
             self._model_popup.addItemWithTitle_(_MODEL_INFO[key])
-        # Select current model
         current_display = _MODEL_INFO.get(config.model, config.model)
         self._model_popup.selectItemWithTitle_(current_display)
         self._model_popup.setTarget_(self)
@@ -144,7 +290,7 @@ class SettingsWindow:
         self._device_popup = AppKit.NSPopUpButton.alloc().initWithFrame_pullsDown_(
             Foundation.NSMakeRect(control_x, y - 4, control_w, 26), False
         )
-        self._device_indices: list[Optional[int]] = [None]  # first entry = system default
+        self._device_indices: list[Optional[int]] = [None]
         self._device_popup.addItemWithTitle_("System Default")
         try:
             import sounddevice as sd
@@ -154,8 +300,7 @@ class SettingsWindow:
                     self._device_popup.addItemWithTitle_(dev["name"])
                     self._device_indices.append(i)
         except Exception:
-            pass  # sounddevice not available — just show System Default
-        # Select current device
+            pass
         if config.audio_device is not None:
             try:
                 idx = self._device_indices.index(config.audio_device)
@@ -203,9 +348,16 @@ class SettingsWindow:
     @objc.typedSelector(b"v@:@")
     def onSettingChanged_(self, sender):
         """Persist all settings to NSUserDefaults on any change."""
+        # Resolve trigger key from dropdown index
+        key_idx = self._key_popup.indexOfSelectedItem()
+        trigger_key = _TRIGGER_KEY_IDS[key_idx] if key_idx < len(_TRIGGER_KEY_IDS) else "alt_r"
+
+        # Update keyboard highlight
+        self._keyboard.setSelectedKey_(trigger_key)
+
         # Resolve model key from display name
         selected_model_display = str(self._model_popup.titleOfSelectedItem())
-        model_key = "turbo"  # fallback
+        model_key = "turbo"
         for key, display in _MODEL_INFO.items():
             if display == selected_model_display:
                 model_key = key
@@ -216,7 +368,7 @@ class SettingsWindow:
         audio_device = self._device_indices[device_idx] if device_idx < len(self._device_indices) else None
 
         config = TakConfig(
-            trigger_key=str(self._key_popup.titleOfSelectedItem()),
+            trigger_key=trigger_key,
             model=model_key,
             use_clipboard=self._clipboard_check.state() == AppKit.NSControlStateValueOn,
             audio_device=audio_device,
