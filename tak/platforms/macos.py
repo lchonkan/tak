@@ -102,28 +102,33 @@ def type_text_clipboard(text: str) -> bool:
     if not text.strip():
         return False
     try:
-        # Save current clipboard
+        # Save current clipboard (raw bytes to handle any content type)
         old_clip = subprocess.run(
             ["pbpaste"],
-            capture_output=True, text=True, timeout=2,
+            capture_output=True, timeout=2,
         ).stdout
 
         # Set new clipboard content
         proc = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
         proc.communicate(text.encode("utf-8"))
 
-        # Paste with Cmd+V
-        subprocess.run(
-            ["osascript", "-e",
-             'tell application "System Events" to keystroke "v" using command down'],
-            check=True, timeout=5, capture_output=True,
-        )
+        # Paste with Cmd+V via CGEvents (uses Accessibility permission,
+        # avoids needing separate Automation permission for System Events)
+        import Quartz
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateCombinedSessionState)
+        # Key code 9 = 'v'
+        cmd_down = Quartz.CGEventCreateKeyboardEvent(src, 9, True)
+        cmd_up = Quartz.CGEventCreateKeyboardEvent(src, 9, False)
+        Quartz.CGEventSetFlags(cmd_down, Quartz.kCGEventFlagMaskCommand)
+        Quartz.CGEventSetFlags(cmd_up, Quartz.kCGEventFlagMaskCommand)
+        Quartz.CGEventPost(Quartz.kCGAnnotatedSessionEventTap, cmd_down)
+        Quartz.CGEventPost(Quartz.kCGAnnotatedSessionEventTap, cmd_up)
 
         time.sleep(0.1)
 
         # Restore original clipboard
         proc = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
-        proc.communicate(old_clip.encode("utf-8"))
+        proc.communicate(old_clip)
 
         return True
     except Exception as e:

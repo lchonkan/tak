@@ -4,3 +4,6 @@ __pycache__/
 *.wav
 *.mov
 marketing/
+build/
+dist/
+*.egg-info/
