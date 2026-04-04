@@ -60,9 +60,15 @@ def main():
     config = load_config()
     logging.info("Config loaded: key=%s model=%s", config.trigger_key, config.model)
 
-    # Platform setup — skip the accessibility check (it calls sys.exit(1)
-    # if not granted, which is designed for terminal mode). The .app bundle
-    # gets its own Accessibility prompt from macOS when pynput activates.
+    # Prompt for Accessibility permission if not yet granted.
+    # AXIsProcessTrustedWithOptions with kAXTrustedCheckOptionPrompt shows
+    # a system alert directing the user to System Settings > Accessibility.
+    import ApplicationServices
+    from Foundation import NSDictionary
+    opts = NSDictionary.dictionaryWithObject_forKey_(True, "AXTrustedCheckOptionPrompt")
+    if not ApplicationServices.AXIsProcessTrustedWithOptions(opts):
+        logging.warning("Accessibility permission not yet granted — user was prompted")
+
     backend.adjust_key_map()
     logging.info("Platform setup done")
 
