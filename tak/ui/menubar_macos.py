@@ -185,7 +185,7 @@ class MacMenuBar(AppKit.NSObject):
     def openSettings_(self, sender):
         if self._settings_window is None:
             from tak.ui.settings_macos import SettingsWindow
-            self._settings_window = SettingsWindow()
+            self._settings_window = SettingsWindow.alloc().init()
         self._settings_window.show()
 
     @objc.typedSelector(b"v@:@")
