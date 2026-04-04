@@ -170,6 +170,13 @@ class MacMenuBar(AppKit.NSObject):
 
         menu.addItem_(AppKit.NSMenuItem.separatorItem())
 
+        # Uninstall
+        uninstall_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Uninstall TAK\u2026", "uninstallApp:", ""
+        )
+        uninstall_item.setTarget_(self)
+        menu.addItem_(uninstall_item)
+
         # Quit
         quit_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
             "Quit TAK", "quitApp:", "q"
@@ -187,6 +194,69 @@ class MacMenuBar(AppKit.NSObject):
             from tak.ui.settings_macos import SettingsWindow
             self._settings_window = SettingsWindow.alloc().init()
         self._settings_window.show()
+
+    @objc.typedSelector(b"v@:@")
+    def uninstallApp_(self, sender):
+        alert = AppKit.NSAlert.alloc().init()
+        alert.setMessageText_("Uninstall TAK?")
+        alert.setInformativeText_(
+            "This will remove:\n"
+            "\u2022 TAK.app\n"
+            "\u2022 Saved preferences\n"
+            "\u2022 Log files\n"
+            "\u2022 Downloaded Whisper models\n"
+            "\u2022 Microphone & Accessibility permissions\n\n"
+            "This cannot be undone."
+        )
+        alert.setAlertStyle_(AppKit.NSAlertStyleCritical)
+        alert.addButtonWithTitle_("Uninstall")
+        alert.addButtonWithTitle_("Cancel")
+
+        # Style the Uninstall button as destructive
+        alert.buttons()[0].setHasDestructiveAction_(True)
+
+        AppKit.NSApp.activateIgnoringOtherApps_(True)
+        response = alert.runModal()
+        if response == AppKit.NSAlertFirstButtonReturn:
+            self._perform_uninstall()
+
+    def _perform_uninstall(self):
+        import os
+        import shutil
+        import subprocess
+
+        bundle_path = Foundation.NSBundle.mainBundle().bundlePath()
+        bundle_id = Foundation.NSBundle.mainBundle().bundleIdentifier() or "com.tak.app"
+
+        # 1. Clear NSUserDefaults
+        AppKit.NSUserDefaults.standardUserDefaults().removePersistentDomainForName_(bundle_id)
+
+        # 2. Remove log directory
+        log_dir = os.path.expanduser("~/Library/Logs/TAK")
+        if os.path.isdir(log_dir):
+            shutil.rmtree(log_dir, ignore_errors=True)
+
+        # 3. Remove cached Whisper models
+        hf_cache = os.path.expanduser("~/.cache/huggingface/hub")
+        if os.path.isdir(hf_cache):
+            for entry in os.listdir(hf_cache):
+                if entry.startswith("models--mlx-community--whisper"):
+                    shutil.rmtree(os.path.join(hf_cache, entry), ignore_errors=True)
+
+        # 4. Reset macOS permissions
+        subprocess.run(["tccutil", "reset", "Microphone", bundle_id],
+                       capture_output=True)
+        subprocess.run(["tccutil", "reset", "Accessibility", bundle_id],
+                       capture_output=True)
+
+        # 5. Move app to Trash (works even while running — macOS allows it)
+        if bundle_path.endswith(".app"):
+            workspace = AppKit.NSWorkspace.sharedWorkspace()
+            url = Foundation.NSURL.fileURLWithPath_(bundle_path)
+            workspace.recycleURLs_completionHandler_([url], None)
+
+        # 6. Quit
+        AppKit.NSApp.terminate_(None)
 
     @objc.typedSelector(b"v@:@")
     def quitApp_(self, sender):

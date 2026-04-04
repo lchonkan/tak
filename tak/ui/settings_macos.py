@@ -84,125 +84,6 @@ _MODEL_INFO = {
 }
 
 
-# ─── Keyboard visualization ──────────────────────────────────────────
-
-# Key layout for the bottom two rows of a Mac keyboard.
-# Each key: (label, x, y, w, h, key_id_or_None)
-_KEY_H = 26
-_GAP = 2
-_KB_W = 380
-_KB_H = _KEY_H * 2 + _GAP
-
-def _keyboard_keys():
-    """Return list of (label, x, y, w, h, key_id) for keyboard drawing."""
-    keys = []
-    y1 = _KEY_H + _GAP   # shift row (top)
-    y0 = 0                # modifier row (bottom)
-
-    # ── Shift row ───────────────────────────────────────────────
-    x = 0
-    def _add(label, w, key_id=None, y=y1):
-        nonlocal x
-        keys.append((label, x, y, w, _KEY_H, key_id))
-        x += w + _GAP
-
-    _add("⇧", 54)
-    for ch in "ZXCVBNM":
-        _add(ch, 24)
-    _add(",", 24); _add(".", 24); _add("/", 24)
-    # Right Shift fills remaining space
-    rshift_w = _KB_W - x
-    keys.append(("⇧ shift", x, y1, rshift_w, _KEY_H, "shift_r"))
-
-    # ── Modifier row ────────────────────────────────────────────
-    x = 0
-    def _add2(label, w, key_id=None):
-        nonlocal x
-        keys.append((label, x, y0, w, _KEY_H, key_id))
-        x += w + _GAP
-
-    _add2("fn", 30)
-    _add2("⌃", 30)
-    _add2("⌥", 36)
-    _add2("⌘", 44)
-    # Space
-    space_w = 120
-    _add2("", space_w)
-    # Right Command
-    _add2("⌘", 44, "cmd_r")
-    # Right Option fills to end
-    ropt_w = _KB_W - x
-    keys.append(("⌥ option", x, y0, ropt_w, _KEY_H, "alt_r"))
-
-    return keys
-
-_KEYBOARD_KEYS = _keyboard_keys()
-
-_HIGHLIGHT = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(
-    0.25, 0.52, 0.96, 1.0
-)
-_KEY_BG = AppKit.NSColor.colorWithCalibratedWhite_alpha_(0.22, 1.0)
-_KEY_BORDER = AppKit.NSColor.colorWithCalibratedWhite_alpha_(0.35, 1.0)
-
-
-class KeyboardView(AppKit.NSView):
-    """Custom NSView that draws a keyboard and highlights the selected key."""
-
-    _selected_key = objc.ivar()
-
-    def initWithFrame_(self, frame):
-        self = objc.super(KeyboardView, self).initWithFrame_(frame)
-        if self is None:
-            return None
-        self._selected_key = "alt_r"
-        return self
-
-    def setSelectedKey_(self, key_id):
-        self._selected_key = key_id
-        self.setNeedsDisplay_(True)
-
-    def isFlipped(self):
-        return False
-
-    def drawRect_(self, dirty):
-        for label, kx, ky, kw, kh, key_id in _KEYBOARD_KEYS:
-            rect = Foundation.NSMakeRect(kx, ky, kw, kh)
-            path = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-                rect, 4, 4
-            )
-
-            # Fill
-            if key_id and key_id == self._selected_key:
-                _HIGHLIGHT.set()
-            else:
-                _KEY_BG.set()
-            path.fill()
-
-            # Border
-            _KEY_BORDER.set()
-            path.setLineWidth_(0.5)
-            path.stroke()
-
-            # Label
-            if key_id and key_id == self._selected_key:
-                color = AppKit.NSColor.whiteColor()
-            else:
-                color = AppKit.NSColor.labelColor()
-
-            font = AppKit.NSFont.systemFontOfSize_(10)
-            attrs = {
-                AppKit.NSFontAttributeName: font,
-                AppKit.NSForegroundColorAttributeName: color,
-            }
-            text = Foundation.NSAttributedString.alloc().initWithString_attributes_(
-                label, attrs
-            )
-            text_size = text.size()
-            tx = kx + (kw - text_size.width) / 2
-            ty = ky + (kh - text_size.height) / 2
-            text.drawAtPoint_(Foundation.NSMakePoint(tx, ty))
-
-
 # ─── Preferences window ────────────────────────────────────────────────
 
 class SettingsWindow(AppKit.NSObject):
@@ -216,7 +97,7 @@ class SettingsWindow(AppKit.NSObject):
         return self
 
     def _build(self):
-        w, h = 420, 360
+        w, h = 420, 280
         rect = Foundation.NSMakeRect(0, 0, w, h)
 
         self._window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -255,19 +136,7 @@ class SettingsWindow(AppKit.NSObject):
         self._key_popup.setAction_("onSettingChanged:")
         content.addSubview_(self._key_popup)
 
-        y -= 36
-
-        # ── Keyboard visualization ──────────────────────────────────
-        kb_x = label_x
-        kb_w = _KB_W
-        kb_h = _KB_H
-        self._keyboard = KeyboardView.alloc().initWithFrame_(
-            Foundation.NSMakeRect(kb_x, y - kb_h, kb_w, kb_h)
-        )
-        self._keyboard.setSelectedKey_(config.trigger_key)
-        content.addSubview_(self._keyboard)
-
-        y -= kb_h + 20
+        y -= 44
 
         # ── Whisper Model ───────────────────────────────────────────
         self._add_label(content, "Whisper Model:", label_x, y)
@@ -351,9 +220,6 @@ class SettingsWindow(AppKit.NSObject):
         # Resolve trigger key from dropdown index
         key_idx = self._key_popup.indexOfSelectedItem()
         trigger_key = _TRIGGER_KEY_IDS[key_idx] if key_idx < len(_TRIGGER_KEY_IDS) else "alt_r"
-
-        # Update keyboard highlight
-        self._keyboard.setSelectedKey_(trigger_key)
 
         # Resolve model key from display name
         selected_model_display = str(self._model_popup.titleOfSelectedItem())
