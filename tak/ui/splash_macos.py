@@ -224,12 +224,17 @@ class DownloadSplash:
 # ─── tqdm-compatible progress reporter ────────────────────────────────
 
 class _DownloadProgress:
-    """Minimal tqdm replacement that reports download progress to DownloadSplash."""
+    """Minimal tqdm replacement that reports download progress to DownloadSplash.
+
+    snapshot_download creates ONE instance with total=0, then its internal
+    _AggregatedTqdm increments .total and calls .update() as files download.
+    We track the first non-disabled instance as the "main" bar and read its
+    .total / .n directly — no init-time size threshold needed.
+    """
 
     _lock = threading.Lock()
     _splash: DownloadSplash | None = None
-    _total = 0
-    _done = 0
+    _main_bar: "_DownloadProgress | None" = None
     _t0: float | None = None
 
     def __init__(self, iterable=None, *args, **kwargs):
@@ -237,33 +242,36 @@ class _DownloadProgress:
         self.total = kwargs.get("total") or 0
         self.n = 0
         self.disable = kwargs.get("disable", False)
-        self._tracked = False
         self._last_ui = 0.0
 
-        if not self.disable and self.total > 1_000_000:
+        if not self.disable:
             with _DownloadProgress._lock:
-                if _DownloadProgress._t0 is None:
+                if _DownloadProgress._main_bar is None:
+                    _DownloadProgress._main_bar = self
                     _DownloadProgress._t0 = time.time()
-                _DownloadProgress._total += self.total
-                self._tracked = True
 
     def update(self, n=1):
         self.n += n
-        if not self._tracked:
+
+        # Only the main bar reports to the splash
+        main = _DownloadProgress._main_bar
+        if main is not self:
             return
-        with _DownloadProgress._lock:
-            _DownloadProgress._done += n
-            done = _DownloadProgress._done
-            total = _DownloadProgress._total
-            t0 = _DownloadProgress._t0
 
         now = time.time()
         if now - self._last_ui < 0.08:
             return
         self._last_ui = now
 
+        total = self.total
+        done = self.n
+        t0 = _DownloadProgress._t0
+
+        if total <= 0:
+            return
+
         elapsed = max(now - (t0 or now), 0.001)
-        frac = done / total if total else 0
+        frac = done / total
         speed = done / elapsed
         eta = (total - done) / speed if speed > 0 else 0
 
@@ -319,8 +327,7 @@ class _DownloadProgress:
     def _reset(cls):
         with cls._lock:
             cls._splash = None
-            cls._total = 0
-            cls._done = 0
+            cls._main_bar = None
             cls._t0 = None
 
 
