@@ -10,6 +10,10 @@ import AppKit
 import Foundation
 
 from tak.config import TakConfig
+from tak.ui.design import (
+    rgb, TEXT, TEXT_DIM, ACCENT,
+    RADIUS, CardView, avenir_medium, make_label,
+)
 
 
 # ─── NSUserDefaults keys ────────────────────────────────────────────────
@@ -63,9 +67,9 @@ def save_config(config: TakConfig) -> None:
 # ─── Trigger key options ──────────────────────────────────────────────
 
 _TRIGGER_KEYS = [
-    ("alt_r",   "Right Option (⌥)"),
-    ("shift_r", "Right Shift (⇧)"),
-    ("cmd_r",   "Right Command (⌘)"),
+    ("alt_r",   "Right Option (\u2325)"),
+    ("shift_r", "Right Shift (\u21e7)"),
+    ("cmd_r",   "Right Command (\u2318)"),
 ]
 
 _TRIGGER_KEY_IDS = [k for k, _ in _TRIGGER_KEYS]
@@ -84,81 +88,128 @@ _MODEL_INFO = {
 }
 
 
+# ─── Borderless panel that accepts keyboard focus ─────────────────────
+
+class _SettingsPanel(AppKit.NSPanel):
+    """NSPanel subclass that can become key for interactive controls."""
+
+    def canBecomeKeyWindow(self):
+        return True
+
+
 # ─── Preferences window ────────────────────────────────────────────────
 
+_W, _H = 420, 420
+_PAD = 28
+
+
 class SettingsWindow(AppKit.NSObject):
-    """macOS preferences window backed by NSUserDefaults."""
+    """macOS preferences panel matching the TAK design system."""
 
     def init(self):
         self = objc.super(SettingsWindow, self).init()
         if self is None:
             return None
-        self._window: Optional[AppKit.NSWindow] = None
+        self._panel: Optional[AppKit.NSPanel] = None
         return self
 
     def _build(self):
-        w, h = 420, 280
-        rect = Foundation.NSMakeRect(0, 0, w, h)
+        sf = AppKit.NSScreen.mainScreen().frame()
+        x = (sf.size.width - _W) / 2
+        y = (sf.size.height - _H) / 2
 
-        self._window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-            rect,
-            (
-                AppKit.NSWindowStyleMaskTitled
-                | AppKit.NSWindowStyleMaskClosable
-            ),
+        self._panel = _SettingsPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+            Foundation.NSMakeRect(x, y, _W, _H),
+            AppKit.NSWindowStyleMaskBorderless,
             AppKit.NSBackingStoreBuffered,
             False,
         )
-        self._window.setTitle_("TAK Preferences")
-        self._window.center()
-        self._window.setReleasedWhenClosed_(False)
+        self._panel.setLevel_(AppKit.NSFloatingWindowLevel)
+        self._panel.setOpaque_(False)
+        self._panel.setBackgroundColor_(AppKit.NSColor.clearColor())
+        self._panel.setHasShadow_(True)
+        self._panel.setMovableByWindowBackground_(True)
 
-        content = self._window.contentView()
+        # Dark appearance so native controls (popups, checkboxes) render dark
+        self._panel.setAppearance_(
+            AppKit.NSAppearance.appearanceNamed_("NSAppearanceNameDarkAqua")
+        )
+
+        card = CardView.alloc().initWithFrame_(Foundation.NSMakeRect(0, 0, _W, _H))
+        self._panel.contentView().addSubview_(card)
+        cw = _W - 2 * _PAD
+
         config = load_config()
 
-        y = h - 50
-        label_x = 20
-        control_x = 160
-        control_w = 220
+        # Layout top-down (AppKit y=0 at bottom)
+        cy = _H - _PAD
 
-        # ── Trigger Key ─────────────────────────────────────────────
-        self._add_label(content, "Trigger Key:", label_x, y)
-        self._key_popup = AppKit.NSPopUpButton.alloc().initWithFrame_pullsDown_(
-            Foundation.NSMakeRect(control_x, y - 4, control_w, 26), False
+        # ── Header ─────────────────────────────────────────────────
+        cy -= 28
+        title = make_label("TAK", 22, bold=True, color=TEXT)
+        title.setFrame_(Foundation.NSMakeRect(_PAD, cy, cw - 24, 28))
+        card.addSubview_(title)
+
+        # Close button (top-right)
+        close_btn = AppKit.NSButton.alloc().initWithFrame_(
+            Foundation.NSMakeRect(_W - _PAD - 20, cy + 4, 20, 20)
         )
+        close_btn.setBordered_(False)
+        close_btn.setAttributedTitle_(
+            AppKit.NSAttributedString.alloc().initWithString_attributes_(
+                "\u00d7",
+                {
+                    AppKit.NSFontAttributeName: avenir_medium(18),
+                    AppKit.NSForegroundColorAttributeName: TEXT_DIM,
+                },
+            )
+        )
+        close_btn.setTarget_(self)
+        close_btn.setAction_("closePanel:")
+        card.addSubview_(close_btn)
+        cy -= 6
+
+        cy -= 18
+        subtitle = make_label("Preferences", 13, color=TEXT_DIM)
+        subtitle.setFrame_(Foundation.NSMakeRect(_PAD, cy, cw, 18))
+        card.addSubview_(subtitle)
+        cy -= 24
+
+        # ── Settings ───────────────────────────────────────────────
+        label_w = 130
+        control_x = _PAD + label_w + 12
+        control_w = _W - _PAD - control_x
+
+        # Trigger Key
+        cy -= 26
+        self._add_row_label(card, "Trigger Key", _PAD, cy, label_w)
+        self._key_popup = self._add_popup(card, control_x, cy, control_w)
         for label in _TRIGGER_KEY_LABELS:
             self._key_popup.addItemWithTitle_(label)
-        # Select current
         if config.trigger_key in _TRIGGER_KEY_IDS:
-            idx = _TRIGGER_KEY_IDS.index(config.trigger_key)
-            self._key_popup.selectItemAtIndex_(idx)
+            self._key_popup.selectItemAtIndex_(
+                _TRIGGER_KEY_IDS.index(config.trigger_key)
+            )
         self._key_popup.setTarget_(self)
         self._key_popup.setAction_("onSettingChanged:")
-        content.addSubview_(self._key_popup)
+        cy -= 12
 
-        y -= 44
-
-        # ── Whisper Model ───────────────────────────────────────────
-        self._add_label(content, "Whisper Model:", label_x, y)
-        self._model_popup = AppKit.NSPopUpButton.alloc().initWithFrame_pullsDown_(
-            Foundation.NSMakeRect(control_x, y - 4, control_w, 26), False
-        )
-        model_keys = list(_MODEL_INFO.keys())
-        for key in model_keys:
+        # Whisper Model
+        cy -= 26
+        self._add_row_label(card, "Whisper Model", _PAD, cy, label_w)
+        self._model_popup = self._add_popup(card, control_x, cy, control_w)
+        for key in _MODEL_INFO:
             self._model_popup.addItemWithTitle_(_MODEL_INFO[key])
         current_display = _MODEL_INFO.get(config.model, config.model)
         self._model_popup.selectItemWithTitle_(current_display)
         self._model_popup.setTarget_(self)
         self._model_popup.setAction_("onSettingChanged:")
-        content.addSubview_(self._model_popup)
+        cy -= 12
 
-        y -= 44
-
-        # ── Audio Device ────────────────────────────────────────────
-        self._add_label(content, "Audio Device:", label_x, y)
-        self._device_popup = AppKit.NSPopUpButton.alloc().initWithFrame_pullsDown_(
-            Foundation.NSMakeRect(control_x, y - 4, control_w, 26), False
-        )
+        # Audio Device
+        cy -= 26
+        self._add_row_label(card, "Audio Device", _PAD, cy, label_w)
+        self._device_popup = self._add_popup(card, control_x, cy, control_w)
         self._device_indices: list[Optional[int]] = [None]
         self._device_popup.addItemWithTitle_("System Default")
         try:
@@ -178,50 +229,110 @@ class SettingsWindow(AppKit.NSObject):
                 pass
         self._device_popup.setTarget_(self)
         self._device_popup.setAction_("onSettingChanged:")
-        content.addSubview_(self._device_popup)
+        cy -= 12
 
-        y -= 44
-
-        # ── Clipboard mode ──────────────────────────────────────────
+        # Clipboard
+        cy -= 22
         self._clipboard_check = AppKit.NSButton.alloc().initWithFrame_(
-            Foundation.NSMakeRect(label_x, y, control_x + control_w - label_x, 22)
+            Foundation.NSMakeRect(_PAD, cy, cw, 22)
         )
         self._clipboard_check.setButtonType_(AppKit.NSButtonTypeSwitch)
-        self._clipboard_check.setTitle_("Use clipboard paste (Cmd+V)")
+        self._clipboard_check.setFont_(avenir_medium(13))
+        self._clipboard_check.setAttributedTitle_(
+            AppKit.NSAttributedString.alloc().initWithString_attributes_(
+                "Use clipboard paste (\u2318V)",
+                {
+                    AppKit.NSFontAttributeName: avenir_medium(13),
+                    AppKit.NSForegroundColorAttributeName: TEXT,
+                },
+            )
+        )
         self._clipboard_check.setState_(
             AppKit.NSControlStateValueOn if config.use_clipboard
             else AppKit.NSControlStateValueOff
         )
         self._clipboard_check.setTarget_(self)
         self._clipboard_check.setAction_("onSettingChanged:")
-        content.addSubview_(self._clipboard_check)
+        card.addSubview_(self._clipboard_check)
+        cy -= 16
 
-        y -= 40
+        # Info
+        cy -= 15
+        info = make_label("Changes take effect on next launch.", 11, color=TEXT_DIM)
+        info.setFrame_(Foundation.NSMakeRect(_PAD, cy, cw, 15))
+        card.addSubview_(info)
+        cy -= 24
 
-        # ── Info label ──────────────────────────────────────────────
-        info = AppKit.NSTextField.labelWithString_(
-            "Changes take effect on next launch."
+        # ── Separator ──────────────────────────────────────────────
+        sep_view = AppKit.NSView.alloc().initWithFrame_(
+            Foundation.NSMakeRect(_PAD, cy, cw, 1)
         )
-        info.setFrame_(Foundation.NSMakeRect(label_x, y, control_x + control_w - label_x, 18))
-        info.setTextColor_(AppKit.NSColor.secondaryLabelColor())
-        info.setFont_(AppKit.NSFont.systemFontOfSize_(11))
-        content.addSubview_(info)
+        sep_view.setWantsLayer_(True)
+        sep_view.layer().setBackgroundColor_(
+            rgb(33, 38, 45, 0.6).CGColor()
+        )
+        card.addSubview_(sep_view)
+        cy -= 24
 
-    def _add_label(self, parent, text: str, x: float, y: float):
-        label = AppKit.NSTextField.labelWithString_(text)
-        label.setFrame_(Foundation.NSMakeRect(x, y, 130, 18))
+        # ── Donate button ─────────────────────────────────────────
+        btn_w, btn_h = 120, 28
+        cy -= btn_h
+        donate = AppKit.NSButton.alloc().initWithFrame_(
+            Foundation.NSMakeRect((_W - btn_w) / 2, cy, btn_w, btn_h)
+        )
+        donate.setBordered_(False)
+        donate.setWantsLayer_(True)
+        donate.layer().setCornerRadius_(RADIUS / 2)
+        donate.layer().setBackgroundColor_(ACCENT.CGColor())
+        donate.setAttributedTitle_(
+            AppKit.NSAttributedString.alloc().initWithString_attributes_(
+                "\u2665  Donate",
+                {
+                    AppKit.NSFontAttributeName: avenir_medium(13),
+                    AppKit.NSForegroundColorAttributeName: rgb(13, 17, 23),
+                },
+            )
+        )
+        donate.setTarget_(self)
+        donate.setAction_("onDonate:")
+        card.addSubview_(donate)
+
+    # ── Helpers ────────────────────────────────────────────────────
+
+    def _add_row_label(self, parent, text, x, y, w):
+        label = make_label(text, 13, color=TEXT_DIM)
+        label.setFrame_(Foundation.NSMakeRect(x, y, w, 18))
         label.setAlignment_(AppKit.NSTextAlignmentRight)
-        label.setFont_(AppKit.NSFont.systemFontOfSize_(13))
         parent.addSubview_(label)
+
+    def _add_popup(self, parent, x, y, w):
+        popup = AppKit.NSPopUpButton.alloc().initWithFrame_pullsDown_(
+            Foundation.NSMakeRect(x, y - 2, w, 26), False
+        )
+        popup.setFont_(avenir_medium(12))
+        parent.addSubview_(popup)
+        return popup
+
+    # ── Actions ────────────────────────────────────────────────────
+
+    @objc.typedSelector(b"v@:@")
+    def closePanel_(self, sender):
+        self._panel.orderOut_(None)
+
+    @objc.typedSelector(b"v@:@")
+    def onDonate_(self, sender):
+        pass  # placeholder — donation URL will be added later
 
     @objc.typedSelector(b"v@:@")
     def onSettingChanged_(self, sender):
         """Persist all settings to NSUserDefaults on any change."""
-        # Resolve trigger key from dropdown index
         key_idx = self._key_popup.indexOfSelectedItem()
-        trigger_key = _TRIGGER_KEY_IDS[key_idx] if key_idx < len(_TRIGGER_KEY_IDS) else "alt_r"
+        trigger_key = (
+            _TRIGGER_KEY_IDS[key_idx]
+            if key_idx < len(_TRIGGER_KEY_IDS)
+            else "alt_r"
+        )
 
-        # Resolve model key from display name
         selected_model_display = str(self._model_popup.titleOfSelectedItem())
         model_key = "turbo"
         for key, display in _MODEL_INFO.items():
@@ -229,20 +340,25 @@ class SettingsWindow(AppKit.NSObject):
                 model_key = key
                 break
 
-        # Resolve device index
         device_idx = self._device_popup.indexOfSelectedItem()
-        audio_device = self._device_indices[device_idx] if device_idx < len(self._device_indices) else None
+        audio_device = (
+            self._device_indices[device_idx]
+            if device_idx < len(self._device_indices)
+            else None
+        )
 
         config = TakConfig(
             trigger_key=trigger_key,
             model=model_key,
-            use_clipboard=self._clipboard_check.state() == AppKit.NSControlStateValueOn,
+            use_clipboard=(
+                self._clipboard_check.state() == AppKit.NSControlStateValueOn
+            ),
             audio_device=audio_device,
         )
         save_config(config)
 
     def show(self):
-        if self._window is None:
+        if self._panel is None:
             self._build()
-        self._window.makeKeyAndOrderFront_(None)
+        self._panel.makeKeyAndOrderFront_(None)
         AppKit.NSApp.activateIgnoringOtherApps_(True)
