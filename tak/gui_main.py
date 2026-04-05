@@ -63,11 +63,28 @@ def main():
     # Prompt for Accessibility permission if not yet granted.
     # AXIsProcessTrustedWithOptions with kAXTrustedCheckOptionPrompt shows
     # a system alert directing the user to System Settings > Accessibility.
+    # The permission only takes effect after a restart, so if not granted
+    # we show an alert and quit so the user can relaunch.
     import ApplicationServices
     from Foundation import NSDictionary
     opts = NSDictionary.dictionaryWithObject_forKey_(True, "AXTrustedCheckOptionPrompt")
     if not ApplicationServices.AXIsProcessTrustedWithOptions(opts):
-        logging.warning("Accessibility permission not yet granted — user was prompted")
+        logging.warning("Accessibility permission not yet granted — asking user to relaunch")
+        import AppKit
+        ns_app = AppKit.NSApplication.sharedApplication()
+        ns_app.setActivationPolicy_(AppKit.NSApplicationActivationPolicyRegular)
+        ns_app.activateIgnoringOtherApps_(True)
+        alert = AppKit.NSAlert.alloc().init()
+        alert.setMessageText_("Accessibility Permission Required")
+        alert.setInformativeText_(
+            "TAK needs Accessibility access to listen for your trigger key.\n\n"
+            "Please enable TAK in:\n"
+            "System Settings \u2192 Privacy & Security \u2192 Accessibility\n\n"
+            "Then reopen TAK."
+        )
+        alert.addButtonWithTitle_("Quit")
+        alert.runModal()
+        sys.exit(0)
 
     backend.adjust_key_map()
     logging.info("Platform setup done")
@@ -81,8 +98,66 @@ def main():
     # Build backends
     logging.info("Building audio recorder...")
     recorder = backend.MacAudioRecorder(device=config.audio_device)
-    logging.info("Building transcriber...")
-    transcriber = backend.MacTranscriber(config.model)
+
+    # ── Model download + loading with splash overlay ──────────────────
+    import threading
+    import AppKit
+    import Foundation
+
+    ns_app = AppKit.NSApplication.sharedApplication()
+    ns_app.setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
+
+    from tak.ui.splash_macos import DownloadSplash, is_model_cached, download_model
+
+    model_repo = backend.MLX_MODELS.get(config.model, config.model)
+    splash = DownloadSplash()
+
+    def _run_bg(fn):
+        """Run fn in a background thread, pumping NSRunLoop for UI updates."""
+        box, err, done = [None], [None], threading.Event()
+        def _work():
+            try:
+                box[0] = fn()
+            except Exception as exc:
+                err[0] = exc
+            finally:
+                done.set()
+        t = threading.Thread(target=_work, daemon=True)
+        t.start()
+        rl = Foundation.NSRunLoop.currentRunLoop()
+        while not done.is_set():
+            rl.runMode_beforeDate_(
+                Foundation.NSDefaultRunLoopMode,
+                Foundation.NSDate.dateWithTimeIntervalSinceNow_(0.05),
+            )
+        t.join()
+        if err[0]:
+            raise err[0]
+        return box[0]
+
+    if not is_model_cached(model_repo):
+        logging.info("Model not cached — downloading %s", model_repo)
+        splash.show_download(model_repo)
+        try:
+            _run_bg(lambda: download_model(model_repo, splash))
+        except Exception as exc:
+            logging.error("Download failed: %s", exc)
+            splash.hide()
+            alert = AppKit.NSAlert.alloc().init()
+            alert.setMessageText_("Model Download Failed")
+            alert.setInformativeText_(
+                f"Could not download the speech model.\n\n{exc}\n\n"
+                "Check your internet connection and try again."
+            )
+            alert.addButtonWithTitle_("Quit")
+            ns_app.activateIgnoringOtherApps_(True)
+            alert.runModal()
+            sys.exit(1)
+
+    logging.info("Loading model %s...", config.model)
+    splash.show_loading(model_repo)
+    transcriber = _run_bg(lambda: backend.MacTranscriber(config.model))
+    splash.hide()
     logging.info("Backends ready")
 
     # Build UI (MacMenuBar initializes NSApplication internally)
