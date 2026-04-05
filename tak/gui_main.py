@@ -63,11 +63,28 @@ def main():
     # Prompt for Accessibility permission if not yet granted.
     # AXIsProcessTrustedWithOptions with kAXTrustedCheckOptionPrompt shows
     # a system alert directing the user to System Settings > Accessibility.
+    # The permission only takes effect after a restart, so if not granted
+    # we show an alert and quit so the user can relaunch.
     import ApplicationServices
     from Foundation import NSDictionary
     opts = NSDictionary.dictionaryWithObject_forKey_(True, "AXTrustedCheckOptionPrompt")
     if not ApplicationServices.AXIsProcessTrustedWithOptions(opts):
-        logging.warning("Accessibility permission not yet granted — user was prompted")
+        logging.warning("Accessibility permission not yet granted — asking user to relaunch")
+        import AppKit
+        ns_app = AppKit.NSApplication.sharedApplication()
+        ns_app.setActivationPolicy_(AppKit.NSApplicationActivationPolicyRegular)
+        ns_app.activateIgnoringOtherApps_(True)
+        alert = AppKit.NSAlert.alloc().init()
+        alert.setMessageText_("Accessibility Permission Required")
+        alert.setInformativeText_(
+            "TAK needs Accessibility access to listen for your trigger key.\n\n"
+            "Please enable TAK in:\n"
+            "System Settings \u2192 Privacy & Security \u2192 Accessibility\n\n"
+            "Then reopen TAK."
+        )
+        alert.addButtonWithTitle_("Quit")
+        alert.runModal()
+        sys.exit(0)
 
     backend.adjust_key_map()
     logging.info("Platform setup done")
