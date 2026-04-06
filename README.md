@@ -393,6 +393,9 @@ export HF_ENDPOINT=https://hf-mirror.com
 - [ ] Windows support
 - [ ] In-app model download progress indicator
 - [ ] Multiple language selection in preferences
+- [ ] Test model switching behavior (what happens when user changes model in Settings)
+- [ ] Evaluate which Whisper models to expose to end users
+- [ ] Fix Spanish accent characters pasting incorrectly (keyboard input encoding)
 
 ## Contributing
 
