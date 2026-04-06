@@ -384,6 +384,16 @@ export HF_ENDPOINT=https://hf-mirror.com
 ./run.sh
 ```
 
+## TODO
+
+- [ ] Apple Developer ID code signing and notarization for Gatekeeper-ready distribution
+- [ ] DMG installer packaging
+- [ ] Auto-launch on login (Launch Agent / Login Item)
+- [ ] Wayland support (Linux)
+- [ ] Windows support
+- [ ] In-app model download progress indicator
+- [ ] Multiple language selection in preferences
+
 ## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the branching model, commit conventions, and PR guidelines.

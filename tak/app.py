@@ -80,6 +80,7 @@ def _build_key_map() -> dict:
         ("alt_l",       "alt_l"),
         ("shift_r",     "shift_r"),
         ("shift_l",     "shift_l"),
+        ("cmd_r",       "cmd_r"),
         ("scroll_lock", "scroll_lock"),
         ("pause",       "pause"),
         ("insert",      "insert"),
