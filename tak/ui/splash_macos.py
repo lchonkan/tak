@@ -10,64 +10,48 @@ import AppKit
 import Foundation
 import objc
 
+from tak.ui.design import (
+    BORDER, TEXT, TEXT_DIM, ACCENT,
+    CardView, make_label,
+)
 
-# ─── Design tokens (from website/styles.css) ──────────────────────────
-
-def _rgb(r, g, b, a=1.0):
-    return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(r / 255, g / 255, b / 255, a)
-
-_CARD_BG = _rgb(13, 17, 23)          # --bg-card:  #0d1117
-_BORDER  = _rgb(33, 38, 45, 0.6)     # --border:   #21262d
-_TEXT    = _rgb(230, 237, 243)        # --text:     #e6edf3
-_DIM     = _rgb(139, 148, 158)       # --text-dim: #8b949e
-_ACCENT  = _rgb(88, 166, 255)        # --accent:   #58a6ff
-_TRACK   = _rgb(33, 38, 45)          # --border:   #21262d
 
 _W, _H = 420, 220
-_R = 12.0
 _PAD = 32
 
 
 # ─── Custom views ─────────────────────────────────────────────────────
 
-class _CardView(AppKit.NSView):
-    """Rounded card background with subtle border."""
-
-    def drawRect_(self, rect):
-        b = self.bounds()
-        path = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(b, _R, _R)
-        _CARD_BG.set()
-        path.fill()
-        _BORDER.set()
-        path.setLineWidth_(0.5)
-        path.stroke()
-
-
-class _BarView(AppKit.NSView):
-    """Rounded progress bar with track and accent fill."""
+class BarView(AppKit.NSView):
+    """Rounded progress bar with track and configurable fill color."""
 
     def initWithFrame_(self, frame):
-        self = objc.super(_BarView, self).initWithFrame_(frame)
+        self = objc.super(BarView, self).initWithFrame_(frame)
         if self is None:
             return None
         self._pct = 0.0
+        self._fill_color = ACCENT
         return self
 
     def setProgress_(self, v):
         self._pct = max(0.0, min(1.0, v))
         self.setNeedsDisplay_(True)
 
+    def setFillColor_(self, color):
+        self._fill_color = color
+        self.setNeedsDisplay_(True)
+
     def drawRect_(self, rect):
         b = self.bounds()
         r = b.size.height / 2
         track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(b, r, r)
-        _TRACK.set()
+        BORDER.set()
         track.fill()
         if self._pct > 0.005:
             fw = max(b.size.height, b.size.width * self._pct)
             fr = Foundation.NSMakeRect(0, 0, fw, b.size.height)
             fill = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(fr, r, r)
-            _ACCENT.set()
+            self._fill_color.set()
             fill.fill()
 
 
@@ -86,32 +70,6 @@ def _fmt_eta(s):
         return f"~{int(s)}s remaining"
     m, sec = divmod(int(s), 60)
     return f"~{m}m {sec}s remaining"
-
-
-def _make_label(text, size, bold=False, color=None, mono=False):
-    lbl = AppKit.NSTextField.labelWithString_(text)
-    if mono:
-        font = AppKit.NSFont.monospacedSystemFontOfSize_weight_(
-            size, AppKit.NSFontWeightRegular
-        )
-    elif bold:
-        font = (
-            AppKit.NSFont.fontWithName_size_("Avenir-Heavy", size)
-            or AppKit.NSFont.boldSystemFontOfSize_(size)
-        )
-    else:
-        font = (
-            AppKit.NSFont.fontWithName_size_("Avenir-Medium", size)
-            or AppKit.NSFont.systemFontOfSize_(size)
-        )
-    lbl.setFont_(font)
-    if color:
-        lbl.setTextColor_(color)
-    lbl.setBezeled_(False)
-    lbl.setDrawsBackground_(False)
-    lbl.setEditable_(False)
-    lbl.setSelectable_(False)
-    return lbl
 
 
 # ─── Splash window ────────────────────────────────────────────────────
@@ -139,7 +97,7 @@ class DownloadSplash:
         self._panel.setHasShadow_(True)
         self._panel.setMovableByWindowBackground_(True)
 
-        card = _CardView.alloc().initWithFrame_(Foundation.NSMakeRect(0, 0, _W, _H))
+        card = CardView.alloc().initWithFrame_(Foundation.NSMakeRect(0, 0, _W, _H))
         self._panel.contentView().addSubview_(card)
         cw = _W - 2 * _PAD
 
@@ -147,38 +105,38 @@ class DownloadSplash:
         cy = _H - _PAD
 
         cy -= 28
-        title = _make_label("TAK", 22, bold=True, color=_TEXT)
+        title = make_label("TAK", 22, bold=True, color=TEXT)
         title.setFrame_(Foundation.NSMakeRect(_PAD, cy, cw, 28))
         card.addSubview_(title)
         cy -= 6
 
         cy -= 18
-        self._status = _make_label("Preparing\u2026", 13, color=_DIM)
+        self._status = make_label("Preparing\u2026", 13, color=TEXT_DIM)
         self._status.setFrame_(Foundation.NSMakeRect(_PAD, cy, cw, 18))
         card.addSubview_(self._status)
         cy -= 2
 
         cy -= 18
-        self._model = _make_label("", 13, color=_ACCENT)
+        self._model = make_label("", 13, color=ACCENT)
         self._model.setFrame_(Foundation.NSMakeRect(_PAD, cy, cw, 18))
         card.addSubview_(self._model)
         cy -= 20
 
         cy -= 6
-        self._bar = _BarView.alloc().initWithFrame_(
+        self._bar = BarView.alloc().initWithFrame_(
             Foundation.NSMakeRect(_PAD, cy, cw, 6)
         )
         card.addSubview_(self._bar)
         cy -= 16
 
         cy -= 15
-        self._stats = _make_label("", 11, color=_DIM, mono=True)
+        self._stats = make_label("", 11, color=TEXT_DIM, mono=True)
         self._stats.setFrame_(Foundation.NSMakeRect(_PAD, cy, cw, 15))
         card.addSubview_(self._stats)
         cy -= 2
 
         cy -= 15
-        self._speed = _make_label("", 11, color=_DIM, mono=True)
+        self._speed = make_label("", 11, color=TEXT_DIM, mono=True)
         self._speed.setFrame_(Foundation.NSMakeRect(_PAD, cy, cw, 15))
         card.addSubview_(self._speed)
 
