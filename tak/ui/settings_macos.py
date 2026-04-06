@@ -447,9 +447,11 @@ class SettingsWindow(AppKit.NSObject):
         self._dl_bar.setFillColor_(GREEN)
         self._dl_stats.setStringValue_("")
         self._dl_speed.setStringValue_("")
+        self._downloading = False
         AppKit.NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
             2.0, self, "onHideProgress:", None, False
         )
+        self._show_restart_alert()
 
     def _download_failed(self, message: str):
         self._dl_status.setStringValue_("Download failed")
@@ -510,10 +512,22 @@ class SettingsWindow(AppKit.NSObject):
         )
         save_config(config)
 
-        # If the selected model isn't cached locally, download it
+        # If the selected model isn't cached locally, download it first
         model_repo = _MLX_MODELS.get(model_key, model_key)
         if not is_model_cached(model_repo):
             self._start_download(model_key, model_repo)
+        else:
+            self._show_restart_alert()
+
+    def _show_restart_alert(self):
+        alert = AppKit.NSAlert.alloc().init()
+        alert.setMessageText_("Restart Required")
+        alert.setInformativeText_(
+            "Changes will take effect after restarting the app."
+        )
+        alert.addButtonWithTitle_("OK")
+        alert.setAlertStyle_(AppKit.NSAlertStyleInformational)
+        alert.runModal()
 
     def show(self):
         if self._panel is None:
