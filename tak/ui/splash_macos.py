@@ -22,18 +22,23 @@ _PAD = 32
 
 # ─── Custom views ─────────────────────────────────────────────────────
 
-class _BarView(AppKit.NSView):
-    """Rounded progress bar with track and accent fill."""
+class BarView(AppKit.NSView):
+    """Rounded progress bar with track and configurable fill color."""
 
     def initWithFrame_(self, frame):
-        self = objc.super(_BarView, self).initWithFrame_(frame)
+        self = objc.super(BarView, self).initWithFrame_(frame)
         if self is None:
             return None
         self._pct = 0.0
+        self._fill_color = ACCENT
         return self
 
     def setProgress_(self, v):
         self._pct = max(0.0, min(1.0, v))
+        self.setNeedsDisplay_(True)
+
+    def setFillColor_(self, color):
+        self._fill_color = color
         self.setNeedsDisplay_(True)
 
     def drawRect_(self, rect):
@@ -46,7 +51,7 @@ class _BarView(AppKit.NSView):
             fw = max(b.size.height, b.size.width * self._pct)
             fr = Foundation.NSMakeRect(0, 0, fw, b.size.height)
             fill = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(fr, r, r)
-            ACCENT.set()
+            self._fill_color.set()
             fill.fill()
 
 
@@ -118,7 +123,7 @@ class DownloadSplash:
         cy -= 20
 
         cy -= 6
-        self._bar = _BarView.alloc().initWithFrame_(
+        self._bar = BarView.alloc().initWithFrame_(
             Foundation.NSMakeRect(_PAD, cy, cw, 6)
         )
         card.addSubview_(self._bar)

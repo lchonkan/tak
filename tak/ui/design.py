@@ -26,6 +26,7 @@ TEXT_DIM = rgb(139, 148, 158)         # --text-dim:  #8b949e
 ACCENT   = rgb(88, 166, 255)         # --accent:    #58a6ff
 PURPLE   = rgb(188, 140, 255)        # --purple:    #bc8cff
 PINK     = rgb(247, 120, 186)        # --pink:      #f778ba
+GREEN    = rgb(63, 185, 80)           # --green:     #3fb950
 
 RADIUS = 12.0
 

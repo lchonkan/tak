@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Optional
 
 import objc
@@ -11,9 +12,10 @@ import Foundation
 
 from tak.config import TakConfig
 from tak.ui.design import (
-    rgb, TEXT, TEXT_DIM, ACCENT,
+    rgb, TEXT, TEXT_DIM, ACCENT, GREEN, PINK,
     RADIUS, CardView, avenir_medium, make_label,
 )
+from tak.ui.splash_macos import BarView, is_model_cached, download_model
 
 
 # ─── NSUserDefaults keys ────────────────────────────────────────────────
@@ -87,6 +89,16 @@ _MODEL_INFO = {
     "turbo":    "turbo (~2 GB, fast + accurate)",
 }
 
+# MLX Hub repo IDs (mirrors tak.platforms.macos.MLX_MODELS)
+_MLX_MODELS = {
+    "tiny":     "mlx-community/whisper-tiny-mlx",
+    "base":     "mlx-community/whisper-base-mlx",
+    "small":    "mlx-community/whisper-small-mlx",
+    "medium":   "mlx-community/whisper-medium-mlx-fp32",
+    "large-v3": "mlx-community/whisper-large-v3-mlx",
+    "turbo":    "mlx-community/whisper-large-v3-turbo",
+}
+
 
 # ─── Borderless panel that accepts keyboard focus ─────────────────────
 
@@ -111,6 +123,7 @@ class SettingsWindow(AppKit.NSObject):
         if self is None:
             return None
         self._panel: Optional[AppKit.NSPanel] = None
+        self._downloading = False
         return self
 
     def _build(self):
@@ -135,8 +148,9 @@ class SettingsWindow(AppKit.NSObject):
             AppKit.NSAppearance.appearanceNamed_("NSAppearanceNameDarkAqua")
         )
 
-        card = CardView.alloc().initWithFrame_(Foundation.NSMakeRect(0, 0, _W, _H))
-        self._panel.contentView().addSubview_(card)
+        self._card = CardView.alloc().initWithFrame_(Foundation.NSMakeRect(0, 0, _W, _H))
+        self._panel.contentView().addSubview_(self._card)
+        card = self._card
         cw = _W - 2 * _PAD
 
         config = load_config()
@@ -256,11 +270,60 @@ class SettingsWindow(AppKit.NSObject):
         card.addSubview_(self._clipboard_check)
         cy -= 16
 
-        # Info
+        # ── Download progress section (hidden, overlaps bottom) ───
+        # These views occupy the same space as info/separator/donate
+        # and are swapped in when a model download is needed.
+        self._progress_views: list = []
+        cy_p = cy
+
+        cy_p -= 16
+        self._dl_status = make_label("", 12, color=TEXT_DIM)
+        self._dl_status.setFrame_(Foundation.NSMakeRect(_PAD, cy_p, cw, 16))
+        self._dl_status.setHidden_(True)
+        card.addSubview_(self._dl_status)
+        self._progress_views.append(self._dl_status)
+        cy_p -= 2
+
+        cy_p -= 16
+        self._dl_model = make_label("", 12, color=ACCENT)
+        self._dl_model.setFrame_(Foundation.NSMakeRect(_PAD, cy_p, cw, 16))
+        self._dl_model.setHidden_(True)
+        card.addSubview_(self._dl_model)
+        self._progress_views.append(self._dl_model)
+        cy_p -= 10
+
+        cy_p -= 6
+        self._dl_bar = BarView.alloc().initWithFrame_(
+            Foundation.NSMakeRect(_PAD, cy_p, cw, 6)
+        )
+        self._dl_bar.setHidden_(True)
+        card.addSubview_(self._dl_bar)
+        self._progress_views.append(self._dl_bar)
+        cy_p -= 8
+
+        cy_p -= 14
+        self._dl_stats = make_label("", 10, color=TEXT_DIM, mono=True)
+        self._dl_stats.setFrame_(Foundation.NSMakeRect(_PAD, cy_p, cw, 14))
+        self._dl_stats.setHidden_(True)
+        card.addSubview_(self._dl_stats)
+        self._progress_views.append(self._dl_stats)
+        cy_p -= 2
+
+        cy_p -= 14
+        self._dl_speed = make_label("", 10, color=TEXT_DIM, mono=True)
+        self._dl_speed.setFrame_(Foundation.NSMakeRect(_PAD, cy_p, cw, 14))
+        self._dl_speed.setHidden_(True)
+        card.addSubview_(self._dl_speed)
+        self._progress_views.append(self._dl_speed)
+
+        # ── Bottom section (info, separator, donate) ──────────────
+        self._bottom_views: list = []
+
         cy -= 15
         info = make_label("Changes take effect on next launch.", 11, color=TEXT_DIM)
         info.setFrame_(Foundation.NSMakeRect(_PAD, cy, cw, 15))
         card.addSubview_(info)
+        self._bottom_views.append(info)
         cy -= 24
 
         # ── Separator ──────────────────────────────────────────────
@@ -272,6 +335,7 @@ class SettingsWindow(AppKit.NSObject):
             rgb(33, 38, 45, 0.6).CGColor()
         )
         card.addSubview_(sep_view)
+        self._bottom_views.append(sep_view)
         cy -= 24
 
         # ── Donate button ─────────────────────────────────────────
@@ -296,6 +360,7 @@ class SettingsWindow(AppKit.NSObject):
         donate.setTarget_(self)
         donate.setAction_("onDonate:")
         card.addSubview_(donate)
+        self._bottom_views.append(donate)
 
     # ── Helpers ────────────────────────────────────────────────────
 
@@ -313,6 +378,96 @@ class SettingsWindow(AppKit.NSObject):
         parent.addSubview_(popup)
         return popup
 
+    def _on_main(self, fn):
+        if AppKit.NSThread.isMainThread():
+            fn()
+        else:
+            AppKit.NSOperationQueue.mainQueue().addOperationWithBlock_(fn)
+
+    def _read_model_key(self) -> str:
+        selected = str(self._model_popup.titleOfSelectedItem())
+        for key, display in _MODEL_INFO.items():
+            if display == selected:
+                return key
+        return "turbo"
+
+    # ── Download progress ─────────────────────────────────────────
+
+    def _show_download_ui(self, model_repo: str):
+        for v in self._bottom_views:
+            v.setHidden_(True)
+        self._dl_status.setStringValue_("Downloading speech model")
+        self._dl_status.setTextColor_(TEXT_DIM)
+        self._dl_model.setStringValue_(model_repo)
+        self._dl_model.setTextColor_(ACCENT)
+        self._dl_bar.setProgress_(0.0)
+        self._dl_bar.setFillColor_(ACCENT)
+        self._dl_stats.setStringValue_("")
+        self._dl_speed.setStringValue_("")
+        for v in self._progress_views:
+            v.setHidden_(False)
+        self._model_popup.setEnabled_(False)
+
+    def _hide_download_ui(self):
+        for v in self._progress_views:
+            v.setHidden_(True)
+        for v in self._bottom_views:
+            v.setHidden_(False)
+        self._model_popup.setEnabled_(True)
+        self._downloading = False
+
+    def update_progress(self, progress, downloaded, total, speed, eta):
+        """Called by _DownloadProgress from the download thread."""
+        def _do():
+            self._dl_bar.setProgress_(progress)
+            self._dl_stats.setStringValue_(
+                f"{int(progress * 100)}%  \u00b7  {downloaded} / {total}"
+            )
+            self._dl_speed.setStringValue_(f"{speed}  \u00b7  {eta}")
+        self._on_main(_do)
+
+    def _start_download(self, model_key: str, model_repo: str):
+        self._downloading = True
+        self._show_download_ui(model_repo)
+
+        def _work():
+            try:
+                download_model(model_repo, self)
+                self._on_main(self._download_complete)
+            except Exception as exc:
+                msg = str(exc)
+                self._on_main(lambda: self._download_failed(msg))
+
+        threading.Thread(target=_work, daemon=True).start()
+
+    def _download_complete(self):
+        self._dl_status.setStringValue_("Download complete")
+        self._dl_status.setTextColor_(GREEN)
+        self._dl_bar.setProgress_(1.0)
+        self._dl_bar.setFillColor_(GREEN)
+        self._dl_stats.setStringValue_("")
+        self._dl_speed.setStringValue_("")
+        AppKit.NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            2.0, self, "onHideProgress:", None, False
+        )
+
+    def _download_failed(self, message: str):
+        self._dl_status.setStringValue_("Download failed")
+        self._dl_status.setTextColor_(PINK)
+        self._dl_bar.setFillColor_(PINK)
+        self._dl_model.setStringValue_(message)
+        self._dl_model.setTextColor_(TEXT_DIM)
+        self._dl_stats.setStringValue_("")
+        self._dl_speed.setStringValue_("")
+        AppKit.NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            3.0, self, "onHideProgress:", None, False
+        )
+
+    @objc.typedSelector(b"v@:@")
+    def onHideProgress_(self, timer):
+        self._dl_model.setTextColor_(ACCENT)
+        self._hide_download_ui()
+
     # ── Actions ────────────────────────────────────────────────────
 
     @objc.typedSelector(b"v@:@")
@@ -326,6 +481,9 @@ class SettingsWindow(AppKit.NSObject):
     @objc.typedSelector(b"v@:@")
     def onSettingChanged_(self, sender):
         """Persist all settings to NSUserDefaults on any change."""
+        if self._downloading:
+            return
+
         key_idx = self._key_popup.indexOfSelectedItem()
         trigger_key = (
             _TRIGGER_KEY_IDS[key_idx]
@@ -333,12 +491,7 @@ class SettingsWindow(AppKit.NSObject):
             else "alt_r"
         )
 
-        selected_model_display = str(self._model_popup.titleOfSelectedItem())
-        model_key = "turbo"
-        for key, display in _MODEL_INFO.items():
-            if display == selected_model_display:
-                model_key = key
-                break
+        model_key = self._read_model_key()
 
         device_idx = self._device_popup.indexOfSelectedItem()
         audio_device = (
@@ -356,6 +509,11 @@ class SettingsWindow(AppKit.NSObject):
             audio_device=audio_device,
         )
         save_config(config)
+
+        # If the selected model isn't cached locally, download it
+        model_repo = _MLX_MODELS.get(model_key, model_key)
+        if not is_model_cached(model_repo):
+            self._start_download(model_key, model_repo)
 
     def show(self):
         if self._panel is None:
