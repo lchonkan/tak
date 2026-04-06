@@ -48,6 +48,9 @@ All crypto goes directly to the maintainer's wallets. Full details: [docs/donati
 - **Voice activity detection** — filters out silence and background noise
 - **Modular architecture** — platform-agnostic core with pluggable backends
 - **Visual overlay** — floating recording indicator on all screens (macOS)
+- **Native menu bar app** — macOS status item with recording state, preferences, and uninstall (macOS)
+- **Preferences UI** — graphical settings for trigger key, model, audio device, and clipboard mode (macOS)
+- **In-app model downloads** — progress bar with speed/ETA when switching models or on first launch (macOS)
 - **Configurable** — choose your trigger key, model size, and input method
 
 ## Requirements
@@ -282,6 +285,10 @@ tak/                                # Project root
 ├── run.sh                          # Cross-platform launcher
 ├── requirements-linux.txt          # Linux Python dependencies
 ├── requirements-macos.txt          # macOS Python dependencies
+├── TAK.spec                        # PyInstaller spec for macOS .app bundle
+├── setup_app.py                    # .app bundle build script
+├── resources/
+│   └── tak.icns                    # macOS app icon
 ├── README.md                       # This file
 ├── CONTRIBUTING.md                 # Git Flow and contributor guide
 ├── CLAUDE.md                       # Instructions for Claude Code
@@ -289,16 +296,23 @@ tak/                                # Project root
 ├── docs/
 │   ├── architecture.md             # Detailed architecture diagrams
 │   ├── platform-architecture.md    # Cross-platform stack comparison
-│   └── macos-implementation-plan.md # macOS implementation spec (completed)
+│   ├── macos-implementation-plan.md # macOS implementation spec (completed)
+│   └── donations.md                # Donation methods and wallet addresses
 ├── tak/                            # Python package
 │   ├── __init__.py                 # Package marker
-│   ├── __main__.py                 # Entry point (platform detection, backend wiring)
+│   ├── __main__.py                 # CLI entry point (platform detection, backend wiring)
+│   ├── gui_main.py                 # GUI entry point for macOS .app bundle
 │   ├── app.py                      # Shared core (TakApp, base classes, CLI, constants)
+│   ├── config.py                   # TakConfig dataclass (platform-agnostic settings)
 │   ├── platforms/
 │   │   ├── linux.py                # Linux backend (faster-whisper, PipeWire/ALSA, xdotool)
 │   │   └── macos.py                # macOS backend (mlx-whisper, Core Audio, AppleScript)
 │   └── ui/
-│       └── overlay_macos.py        # macOS floating overlay (PyObjC)
+│       ├── design.py               # Shared design system (colors, fonts, card views)
+│       ├── overlay_macos.py        # Floating recording/transcribing pill overlay
+│       ├── menubar_macos.py        # macOS menu bar status item and dropdown
+│       ├── settings_macos.py       # Preferences window (NSUserDefaults persistence)
+│       └── splash_macos.py         # Model download splash screen
 └── .gitignore
 ```
 
@@ -391,7 +405,6 @@ export HF_ENDPOINT=https://hf-mirror.com
 - [ ] Auto-launch on login (Launch Agent / Login Item)
 - [ ] Wayland support (Linux)
 - [ ] Windows support
-- [ ] In-app model download progress indicator
 - [ ] Multiple language selection in preferences
 - [ ] Test model switching behavior (what happens when user changes model in Settings)
 - [ ] Evaluate which Whisper models to expose to end users
