@@ -71,18 +71,23 @@ graph LR
 
 ## Module Structure
 
-TAK is split into three modules with a clear dependency flow. Platform branching happens only in the entry point — the core module has no platform-specific imports.
+TAK has two entry points (CLI and GUI), a platform-agnostic core, pluggable platform backends, and a macOS-native UI layer. Platform branching happens only in the entry points — the core module has no platform-specific imports.
 
 ```mermaid
 graph TD
-    subgraph "tak/__main__.py — Entry Point"
-        EP[Platform detection<br/>Backend wiring<br/>Dependency injection]
+    subgraph "Entry Points"
+        EP_CLI["tak/__main__.py — CLI<br/>Platform detection · CLI args<br/>Backend wiring"]
+        EP_GUI["tak/gui_main.py — GUI<br/>macOS .app bundle<br/>NSUserDefaults config"]
     end
 
     subgraph "tak/app.py — Shared Core"
         TAKAPP[TakApp]
         BASE[BaseAudioRecorder<br/>BaseTranscriber]
         UTIL[parse_args · colors · constants<br/>KEY_MAP · _resample · normalize]
+    end
+
+    subgraph "tak/config.py"
+        CONFIG[TakConfig dataclass]
     end
 
     subgraph "tak/platforms/linux.py — Linux Backend"
@@ -101,9 +106,27 @@ graph TD
         MAC_IF[platform_setup · get_default_model<br/>get_platform_label]
     end
 
-    EP -->|imports| TAKAPP
-    EP -->|imports on Linux| LINUX_IF
-    EP -->|imports on macOS| MAC_IF
+    subgraph "tak/ui/ — macOS UI Layer"
+        DESIGN[design.py<br/>Colors · Fonts · CardView]
+        OVERLAY[overlay_macos.py<br/>Recording pill overlay]
+        MENUBAR[menubar_macos.py<br/>NSStatusItem · dropdown menu]
+        SETTINGS[settings_macos.py<br/>Preferences window<br/>NSUserDefaults persistence]
+        SPLASH[splash_macos.py<br/>Model download splash]
+    end
+
+    EP_CLI -->|imports| TAKAPP
+    EP_CLI -->|imports on Linux| LINUX_IF
+    EP_CLI -->|imports on macOS| MAC_IF
+    EP_GUI -->|imports| TAKAPP
+    EP_GUI -->|imports| MAC_IF
+    EP_GUI -->|loads config| CONFIG
+    EP_GUI -->|builds UI| MENUBAR
+    EP_GUI -->|builds UI| OVERLAY
+    EP_GUI -->|shows on first run| SPLASH
+    SETTINGS -->|reads/writes| CONFIG
+    SETTINGS -->|uses| DESIGN
+    SPLASH -->|uses| DESIGN
+    MENUBAR -->|opens| SETTINGS
     LINUX_TR -->|extends| BASE
     LINUX_REC -->|extends| BASE
     MAC_TR -->|extends| BASE
@@ -118,10 +141,12 @@ graph TD
 
 ### Design Principles
 
-- **No `if IS_MACOS` inside core.** Platform branching happens only in `tak/__main__.py` (entry point).
+- **No `if IS_MACOS` inside core.** Platform branching happens only in entry points (`tak/__main__.py`, `tak/gui_main.py`).
+- **Two entry points.** `__main__.py` for CLI usage, `gui_main.py` for the macOS `.app` bundle (uses NSUserDefaults instead of CLI args).
 - **Constructor injection.** `TakApp` receives backends as arguments — it never imports a platform module.
 - **Each platform file is self-contained.** Deleting `tak/platforms/linux.py` on a Mac causes no errors.
 - **Shared utilities in core.** Resampling, normalization, colors, constants, CLI parsing — all platform-agnostic.
+- **Shared design system.** `tak/ui/design.py` provides color tokens, fonts, and reusable views for all macOS UI components.
 
 ---
 
@@ -303,9 +328,16 @@ classDiagram
 | Class / Function | Module |
 |---|---|
 | `TakApp`, `BaseAudioRecorder`, `BaseTranscriber`, `parse_args()` | `tak/app.py` |
+| `TakConfig` | `tak/config.py` |
 | `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/platforms/linux.py` |
 | `MacAudioRecorder`, `MacTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/platforms/macos.py` |
-| Platform detection, backend wiring | `tak/__main__.py` |
+| CLI platform detection, backend wiring | `tak/__main__.py` |
+| GUI entry point, NSUserDefaults config, download splash | `tak/gui_main.py` |
+| `MacMenuBar` (NSStatusItem, dropdown menu) | `tak/ui/menubar_macos.py` |
+| `SettingsWindow` (preferences panel, NSUserDefaults persistence) | `tak/ui/settings_macos.py` |
+| `MacOverlay` (floating recording pill) | `tak/ui/overlay_macos.py` |
+| `DownloadSplash` (model download progress) | `tak/ui/splash_macos.py` |
+| Design tokens, `CardView`, `BarView`, font helpers | `tak/ui/design.py` |
 
 ---
 
@@ -504,6 +536,8 @@ graph TD
 
 How TAK manages concurrency to keep the UI responsive.
 
+### CLI mode (Linux and macOS via `python -m tak`)
+
 ```mermaid
 graph TD
     subgraph Main Thread
@@ -535,10 +569,53 @@ graph TD
     style Worker_Thread fill:#fff3e0
 ```
 
+### GUI mode (macOS `.app` bundle via `gui_main.py`)
+
+In the `.app` bundle, the main thread runs the NSApplication event loop (required for AppKit UI). The pynput key listener runs in a daemon thread instead.
+
+```mermaid
+graph TD
+    subgraph Main Thread
+        MAIN[gui_main.main] --> SPLASH[DownloadSplash<br/>model download if needed]
+        SPLASH --> BUILD[Build TakApp +<br/>MacMenuBar + MacOverlay]
+        BUILD --> NSAPP[NSApplication.run<br/>AppKit event loop]
+    end
+
+    subgraph Pynput Thread["Pynput Thread (daemon)"]
+        PRESS[on_press callback]
+        RELEASE[on_release callback]
+        PRESS -->|start recording| REC[recorder.start]
+        RELEASE -->|stop recording| STOP[recorder.stop]
+    end
+
+    subgraph Worker Thread["Worker Thread (per transcription)"]
+        STOP -->|spawn daemon thread| PROCESS[_process]
+        PROCESS --> LOCK1[Acquire lock]
+        LOCK1 --> TRANSCRIBE[transcriber.transcribe]
+        TRANSCRIBE --> TYPE[_type_fn / _clipboard_fn]
+        TYPE --> LOCK2[Release lock]
+    end
+
+    subgraph UI Updates["UI Updates (main thread via performSelectorOnMainThread)"]
+        OVERLAY[MacOverlay<br/>show/hide recording pill]
+        MENUBAR[MacMenuBar<br/>update status icon/text]
+        SETTINGS[SettingsWindow<br/>preferences + model download]
+    end
+
+    NSAPP -.->|processes| UI_UPDATES
+    PROCESS -.->|callbacks| OVERLAY
+    PROCESS -.->|callbacks| MENUBAR
+
+    style Main_Thread fill:#e1f5fe
+    style Worker_Thread fill:#fff3e0
+```
+
 The threading lock (`_lock`) ensures that:
 - Only one transcription runs at a time
 - New key presses are ignored while a transcription is in progress
 - State transitions are atomic
+
+In GUI mode, all AppKit UI updates (overlay, menu bar, settings window) must happen on the main thread. Background threads use `performSelectorOnMainThread:` to dispatch UI work safely.
 
 ---
 

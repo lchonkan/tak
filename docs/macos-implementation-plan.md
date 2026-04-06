@@ -6,16 +6,25 @@ Development guide for adding macOS support to TAK. This work happened entirely i
 
 ## Current State
 
-macOS support is fully implemented. The codebase is modular:
+macOS support is fully implemented, including a native `.app` bundle with menu bar, preferences UI, and model download progress. The codebase is modular:
 
 ```
-tak/__main__.py         → entry point, platform detection, backend wiring
-tak/app.py              → shared: TakApp, base classes, CLI, colors, constants
-tak/platforms/linux.py  → Linux: faster-whisper, PipeWire/ALSA, xdotool/xclip
-tak/platforms/macos.py  → macOS: mlx-whisper, Core Audio, AppleScript
+tak/__main__.py              → CLI entry point, platform detection, backend wiring
+tak/gui_main.py              → GUI entry point for macOS .app bundle
+tak/app.py                   → shared: TakApp, base classes, CLI, colors, constants
+tak/config.py                → TakConfig dataclass (platform-agnostic settings)
+tak/platforms/linux.py       → Linux: faster-whisper, PipeWire/ALSA, xdotool/xclip
+tak/platforms/macos.py       → macOS: mlx-whisper, Core Audio, AppleScript
+tak/ui/design.py             → shared design system (colors, fonts, card views)
+tak/ui/overlay_macos.py      → floating recording/transcribing pill overlay
+tak/ui/menubar_macos.py      → macOS menu bar status item and dropdown
+tak/ui/settings_macos.py     → preferences window (NSUserDefaults persistence)
+tak/ui/splash_macos.py       → model download splash screen
 ```
 
 ## Deliverables
+
+### Core (Phase 1)
 
 | File | Status | Description |
 |------|--------|-------------|
@@ -24,7 +33,22 @@ tak/platforms/macos.py  → macOS: mlx-whisper, Core Audio, AppleScript
 | `README.md` | **✅ Done** | macOS installation section, updated model table |
 | `docs/architecture.md` | **✅ Done** | macOS backend added to all diagrams |
 
-No changes were made to: `tak/__main__.py`, `tak/app.py`, `tak/platforms/linux.py`, `run.sh`.
+### Native UI & .app Bundle (Phase 2)
+
+| File | Status | Description |
+|------|--------|-------------|
+| `tak/config.py` | **✅ Done** | `TakConfig` dataclass for platform-agnostic settings |
+| `tak/gui_main.py` | **✅ Done** | GUI entry point for `.app` bundle (NSUserDefaults config, download splash) |
+| `tak/ui/design.py` | **✅ Done** | Shared design system — colors, fonts, `CardView`, `BarView` |
+| `tak/ui/overlay_macos.py` | **✅ Done** | Floating recording/transcribing pill overlay on all screens |
+| `tak/ui/menubar_macos.py` | **✅ Done** | `NSStatusItem` with mic icon, status display, Preferences/Uninstall/Quit menu |
+| `tak/ui/settings_macos.py` | **✅ Done** | Preferences window with trigger key, model, audio device, clipboard toggle. Inline model download progress. NSUserDefaults persistence. Restart-required modal. |
+| `tak/ui/splash_macos.py` | **✅ Done** | Model download splash screen with progress bar, speed, and ETA |
+| `TAK.spec` | **✅ Done** | PyInstaller spec for building macOS `.app` bundle |
+| `setup_app.py` | **✅ Done** | Post-build script for `.app` bundle setup |
+| `resources/tak.icns` | **✅ Done** | macOS app icon |
+
+No changes were made to: `tak/app.py`, `tak/platforms/linux.py`.
 
 ---
 

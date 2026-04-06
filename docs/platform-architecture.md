@@ -13,11 +13,12 @@ Cross-platform architecture comparison for TAK, covering the full stack from har
 
 ## Platform Detection & Dispatch
 
-The entire application branches at a single detection point in `tak/__main__.py`. All platform-specific behavior is isolated in backend modules — the core (`tak/app.py`) has zero platform imports.
+TAK has two entry points. The CLI (`python -m tak`) uses command-line arguments and works on both platforms. The GUI (`gui_main.py`) is used by the macOS `.app` bundle and loads settings from NSUserDefaults via a preferences UI.
 
 ```mermaid
 flowchart TD
-    START([python -m tak]) --> DETECT["platform.system()"]
+    START_CLI([python -m tak]) --> DETECT["platform.system()"]
+    START_GUI([TAK.app bundle]) --> GUI["gui_main.py<br/>macOS only"]
 
     DETECT -->|"Linux"| LINUX_IMPORT["from tak.platforms import linux as backend"]
     DETECT -->|"Darwin"| MAC_IMPORT["from tak.platforms import macos as backend"]
@@ -28,6 +29,11 @@ flowchart TD
     LINUX_SETUP --> ARGS[Parse CLI args]
     MAC_SETUP --> ARGS
 
+    GUI --> GUI_CONFIG["load_config()<br/>from NSUserDefaults"]
+    GUI --> GUI_SPLASH["DownloadSplash<br/>if model not cached"]
+    GUI_CONFIG --> GUI_BUILD
+    GUI_SPLASH --> GUI_BUILD
+
     ARGS --> BUILD_LINUX{Linux}
     ARGS --> BUILD_MAC{macOS}
 
@@ -36,10 +42,17 @@ flowchart TD
     BUILD_MAC --> MAC_REC["MacAudioRecorder<br/>Core Audio"]
     BUILD_MAC --> MAC_TR["MacTranscriber<br/>mlx-whisper + Metal"]
 
+    GUI_BUILD["Build backends + UI"] --> MAC_REC_G["MacAudioRecorder"]
+    GUI_BUILD --> MAC_TR_G["MacTranscriber"]
+    GUI_BUILD --> MENUBAR["MacMenuBar<br/>NSStatusItem"]
+    GUI_BUILD --> OVERLAY["MacOverlay<br/>recording pill"]
+
     LINUX_REC --> APP[TakApp — constructor injection]
     LINUX_TR --> APP
     MAC_REC --> APP
     MAC_TR --> APP
+    MAC_REC_G --> APP_G[TakApp — constructor injection]
+    MAC_TR_G --> APP_G
 
     style LINUX_SETUP fill:#76B900,color:#fff
     style MAC_SETUP fill:#007AFF,color:#fff
@@ -47,6 +60,14 @@ flowchart TD
     style LINUX_TR fill:#76B900,color:#fff
     style MAC_REC fill:#007AFF,color:#fff
     style MAC_TR fill:#007AFF,color:#fff
+    style GUI fill:#007AFF,color:#fff
+    style GUI_CONFIG fill:#007AFF,color:#fff
+    style GUI_SPLASH fill:#007AFF,color:#fff
+    style GUI_BUILD fill:#007AFF,color:#fff
+    style MAC_REC_G fill:#007AFF,color:#fff
+    style MAC_TR_G fill:#007AFF,color:#fff
+    style MENUBAR fill:#007AFF,color:#fff
+    style OVERLAY fill:#007AFF,color:#fff
 ```
 
 ---
@@ -85,11 +106,13 @@ graph TB
         M_AUDIO["sounddevice<br/>CoreAudio backend"]
         M_OUTPUT["osascript / AppleScript<br/>keystroke simulation"]
         M_OUTPUT_FB["pbcopy + Cmd+V<br/>clipboard fallback"]
+        M_UI["Native UI (PyObjC)<br/>Menu bar · Preferences<br/>Overlay · Download splash"]
 
         M_HW --> M_METAL --> M_INF --> M_ASR
         M_AUDIO --> M_ASR
         M_ASR --> M_OUTPUT
         M_ASR -.-> M_OUTPUT_FB
+        M_ASR -.-> M_UI
     end
 
     style LINUX fill:#1a1a2e,color:#fff
@@ -108,6 +131,7 @@ graph TB
     style L_OUTPUT_FB fill:#a33,color:#fff
     style M_OUTPUT fill:#555,color:#fff
     style M_OUTPUT_FB fill:#333,color:#fff
+    style M_UI fill:#007AFF,color:#fff
 ```
 
 ---
@@ -226,7 +250,11 @@ sequenceDiagram
 
 ## MLX Model Loading Sequence (macOS Only)
 
-On macOS, mlx-whisper loads MLX-optimized Whisper models from HuggingFace Hub. A warm-up transcription runs at startup to trigger the model download and MLX compilation.
+On macOS, mlx-whisper loads MLX-optimized Whisper models from HuggingFace Hub. The loading sequence differs between CLI and GUI entry points.
+
+### CLI mode (`python -m tak`)
+
+A warm-up transcription runs at startup to trigger the model download and MLX compilation.
 
 ```mermaid
 sequenceDiagram
@@ -256,6 +284,64 @@ sequenceDiagram
     MLX-->>MACOS: Warm-up complete
 
     Note over MACOS: Model loaded, Metal GPU ready
+```
+
+### GUI mode (`TAK.app` bundle)
+
+The `.app` bundle shows a download splash screen with progress bar during initial model download, then a loading overlay while the model initializes.
+
+```mermaid
+sequenceDiagram
+    participant GUI as gui_main.py
+    participant SPLASH as DownloadSplash
+    participant SETTINGS as settings_macos.py
+    participant MACOS as platforms/macos.py
+    participant HF as HuggingFace Hub
+    participant MLX as mlx_whisper
+
+    GUI->>SETTINGS: load_config() from NSUserDefaults
+    SETTINGS-->>GUI: TakConfig(model="turbo", ...)
+
+    GUI->>GUI: is_model_cached(model_repo)?
+
+    alt Model not cached
+        GUI->>SPLASH: show_download(model_repo)
+        GUI->>HF: download_model(model_repo, splash)
+        Note over SPLASH,HF: Progress bar with speed, ETA,<br/>percentage, and bytes downloaded
+        HF-->>GUI: Download complete
+    end
+
+    GUI->>SPLASH: show_loading(model_repo)
+    GUI->>MACOS: MacTranscriber(model)
+    MACOS->>MLX: Warm-up transcription
+    MLX-->>MACOS: Model ready
+    GUI->>SPLASH: hide()
+
+    Note over GUI: Build MenuBar + Overlay → run NSApp
+```
+
+### Settings-triggered model download
+
+When the user changes the model in Preferences and the new model isn't cached, the settings window downloads it inline with a progress bar. A restart-required modal appears after the download completes.
+
+```mermaid
+sequenceDiagram
+    participant USER as User
+    participant SW as SettingsWindow
+    participant HF as HuggingFace Hub
+
+    USER->>SW: Change model dropdown
+    SW->>SW: save_config() to NSUserDefaults
+    SW->>SW: is_model_cached(new_model)?
+
+    alt Model not cached
+        SW->>SW: Show inline progress bar
+        SW->>HF: download_model(new_model)
+        HF-->>SW: Download complete
+    end
+
+    SW->>SW: Show "Restart Required" modal
+    USER->>SW: Click OK
 ```
 
 ---
@@ -357,9 +443,12 @@ flowchart TD
 | ![Model](https://img.shields.io/badge/Model-purple) **Default Model** | `medium` | `turbo` (whisper-large-v3-turbo) |
 | ![Audio](https://img.shields.io/badge/Audio-629FF4) **Recording** | PipeWire `pw-record` / ALSA fallback | Core Audio via `sounddevice` |
 | ![Output](https://img.shields.io/badge/Output-E34F26) **Text Injection** | `xdotool` / `xclip` | AppleScript / `pbcopy` |
-| ![Key](https://img.shields.io/badge/Trigger-blue) **Default Key** | Right Ctrl (`ctrl_r`) | Right Ctrl (`ctrl_r`) |
+| ![Key](https://img.shields.io/badge/Trigger-blue) **Default Key** | Right Ctrl (`ctrl_r`) | Right Option (`alt_r`) |
 | ![Perms](https://img.shields.io/badge/Permissions-yellow) **Access** | `input` group for `/dev/input` | Accessibility + Microphone in System Settings |
 | ![Speed](https://img.shields.io/badge/Speed-green) **Inference Speed** | Fast (CUDA GPU) | Fast (Metal GPU on Apple Silicon) |
+| ![UI](https://img.shields.io/badge/UI-purple) **Native UI** | CLI only | Menu bar + Preferences + Overlay + Download splash (PyObjC) |
+| ![Config](https://img.shields.io/badge/Config-orange) **Settings** | CLI arguments | NSUserDefaults (`.app` bundle) or CLI arguments |
+| ![Bundle](https://img.shields.io/badge/Bundle-blue) **Distribution** | `python -m tak` / `run.sh` | `TAK.app` bundle (PyInstaller) or CLI |
 
 ---
 
@@ -370,4 +459,4 @@ These are not currently implemented but could improve performance further:
 1. **`lightning-whisper-mlx`** — Claims 4× faster than standard mlx-whisper. Could be offered as `--backend lightning`.
 2. **Silero VAD preprocessing** — mlx-whisper has no built-in VAD. Could add as optional preprocessing for noisy environments.
 3. **Intel Mac detection** — Detect `platform.machine() != "arm64"` and warn about slower CPU-only performance.
-4. **CGEventPost text injection** — Better Unicode support than AppleScript. Requires `pyobjc-framework-Quartz`.
+4. **Linux UI** — Port the menu bar, preferences, and overlay UI to Linux (GTK or Qt).

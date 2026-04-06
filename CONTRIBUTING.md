@@ -180,6 +180,10 @@ tak/                                # Project root
 ├── run.sh                          # Cross-platform launcher
 ├── requirements-linux.txt
 ├── requirements-macos.txt
+├── TAK.spec                        # PyInstaller spec for macOS .app bundle
+├── setup_app.py                    # .app bundle build script
+├── resources/
+│   └── tak.icns                    # macOS app icon
 ├── README.md
 ├── CONTRIBUTING.md                 # This file
 ├── CLAUDE.md
@@ -187,15 +191,23 @@ tak/                                # Project root
 ├── docs/
 │   ├── architecture.md
 │   ├── platform-architecture.md
-│   └── macos-implementation-plan.md
+│   ├── macos-implementation-plan.md
+│   └── donations.md
 ├── tak/                            # Python package
 │   ├── __init__.py                 # Package marker
-│   ├── __main__.py                 # Entry point (platform detection, backend wiring)
+│   ├── __main__.py                 # CLI entry point (platform detection, backend wiring)
+│   ├── gui_main.py                 # GUI entry point for macOS .app bundle
 │   ├── app.py                      # Shared core (TakApp, base classes, CLI, constants)
+│   ├── config.py                   # TakConfig dataclass (settings container)
 │   ├── platforms/
 │   │   ├── linux.py                # Linux backend (faster-whisper, PipeWire/ALSA, xdotool)
 │   │   └── macos.py                # macOS backend (mlx-whisper, Core Audio, AppleScript)
-│   └── ui/                         # UI layer (planned)
+│   └── ui/
+│       ├── design.py               # Shared design system (colors, fonts, card views)
+│       ├── overlay_macos.py        # Floating recording/transcribing pill overlay
+│       ├── menubar_macos.py        # macOS menu bar status item and dropdown
+│       ├── settings_macos.py       # Preferences window (NSUserDefaults persistence)
+│       └── splash_macos.py         # Model download splash screen
 └── .gitignore
 ```
 
@@ -204,11 +216,19 @@ tak/                                # Project root
 | Change | File |
 |--------|------|
 | Platform-agnostic logic (shared by all platforms) | `tak/app.py` |
+| Settings data structure | `tak/config.py` (`TakConfig`) |
 | Linux-specific feature or fix | `tak/platforms/linux.py` |
 | macOS-specific feature or fix | `tak/platforms/macos.py` |
 | New platform backend | New `tak/platforms/<platform>.py` file |
 | CLI argument changes | `tak/app.py` (`parse_args()`) |
-| Entry point / platform wiring | `tak/__main__.py` |
+| CLI entry point / platform wiring | `tak/__main__.py` |
+| GUI entry point (macOS .app bundle) | `tak/gui_main.py` |
+| UI colors, fonts, shared components | `tak/ui/design.py` |
+| Menu bar (macOS) | `tak/ui/menubar_macos.py` |
+| Preferences window (macOS) | `tak/ui/settings_macos.py` |
+| Recording overlay (macOS) | `tak/ui/overlay_macos.py` |
+| Download splash screen (macOS) | `tak/ui/splash_macos.py` |
+| .app bundle packaging | `TAK.spec`, `setup_app.py` |
 
 **Design rule:** No `if IS_MACOS` / `if IS_LINUX` inside `tak/app.py`. Platform branching only happens in `tak/__main__.py`.
 

@@ -47,25 +47,41 @@ TAK is a modular push-to-talk speech-to-text app. The architecture uses dependen
 ```
 tak/                            # Python package
 ├── __init__.py                 # Package marker + __version__
-├── __main__.py                 # Entry point (platform detection, backend wiring)
+├── __main__.py                 # CLI entry point (platform detection, backend wiring)
+├── gui_main.py                 # GUI entry point for macOS .app bundle
 ├── app.py                      # Shared core (TakApp, base classes, CLI, constants)
+├── config.py                   # TakConfig dataclass (platform-agnostic settings)
 ├── platforms/
 │   ├── __init__.py
 │   ├── linux.py                # Linux backend
 │   └── macos.py                # macOS backend (mlx-whisper, Core Audio, AppleScript)
-└── ui/                         # UI layer (planned)
-    └── __init__.py
+└── ui/
+    ├── __init__.py
+    ├── design.py               # Shared design system (colors, fonts, card views)
+    ├── overlay_macos.py        # Floating recording/transcribing pill overlay
+    ├── menubar_macos.py        # macOS menu bar status item and dropdown
+    ├── settings_macos.py       # Preferences window (NSUserDefaults persistence)
+    └── splash_macos.py         # Model download splash screen
 ```
 
 ### File responsibilities
 
 | File | Role | Rules |
 |------|------|-------|
-| `tak/__main__.py` | Entry point | Only file that does platform detection. Imports the correct backend and wires it into `TakApp`. |
+| `tak/__main__.py` | CLI entry point | Platform detection, CLI argument parsing, backend wiring into `TakApp`. Used by `run.sh` and `python -m tak`. |
+| `tak/gui_main.py` | GUI entry point | macOS `.app` bundle launcher. Loads config from NSUserDefaults (not CLI args), shows download splash, builds menu bar and overlay. Used by PyInstaller (`TAK.spec`). |
 | `tak/app.py` | Shared core | **Zero platform-specific imports.** No `import platform`, no `if IS_MACOS`. Contains `TakApp`, base classes (`BaseAudioRecorder`, `BaseTranscriber`), `parse_args()`, constants, color helpers, `_resample()`, `KEY_MAP`. |
+| `tak/config.py` | Settings container | `TakConfig` dataclass with `trigger_key`, `model`, `use_clipboard`, `audio_device`. Platform-agnostic — no UI or persistence logic. |
 | `tak/platforms/linux.py` | Linux backend | `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()`, `ensure_cuda_libs()`, `platform_setup()`, `get_default_model()`, `get_platform_label()`. Imports from `tak.app` only. |
 | `tak/platforms/macos.py` | macOS backend | `MacAudioRecorder`, `MacTranscriber`, `type_text()`, `type_text_clipboard()`, `check_accessibility_permission()`, `adjust_key_map()`, `_write_wav()`, `platform_setup()`, `get_default_model()`, `get_platform_label()`. Uses mlx-whisper (Metal), Core Audio (sounddevice), AppleScript (osascript). Imports from `tak.app` only. |
+| `tak/ui/design.py` | Design system | Shared colors, fonts, and reusable views (`CardView`, `BarView`). All UI files import from here. |
+| `tak/ui/overlay_macos.py` | Recording overlay | Floating pill on all screens — red while recording, yellow while transcribing. |
+| `tak/ui/menubar_macos.py` | Menu bar | `NSStatusItem` with mic icon, status display, Preferences / Uninstall / Quit menu items. |
+| `tak/ui/settings_macos.py` | Preferences window | Borderless panel for trigger key, model, audio device, clipboard toggle. Persists to `NSUserDefaults`. Shows inline model download progress. Shows restart-required modal after changes. |
+| `tak/ui/splash_macos.py` | Download splash | Full-screen overlay shown during initial model download with progress bar, speed, and ETA. |
 | `run.sh` | Launcher | Activates conda env, sets CUDA paths on Linux only, runs `python -m tak`. |
+| `TAK.spec` | PyInstaller spec | Builds macOS `.app` bundle via `pyinstaller TAK.spec`. |
+| `setup_app.py` | App bundle setup | Post-build script for code signing and packaging. |
 
 ### Design rules
 
@@ -97,6 +113,7 @@ tak/                            # Python package
 - `docs/architecture.md` — System diagrams, class hierarchy, threading model
 - `docs/platform-architecture.md` — Cross-platform stack comparison diagrams
 - `docs/macos-implementation-plan.md` — macOS implementation spec (completed)
+- `docs/donations.md` — Donation methods and wallet addresses
 
 ## Running and Testing
 
