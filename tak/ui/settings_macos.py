@@ -12,8 +12,8 @@ import Foundation
 
 from tak.config import TakConfig
 from tak.ui.design import (
-    rgb, TEXT, TEXT_DIM, ACCENT, GREEN, PINK,
-    RADIUS, CardView, avenir_medium, make_label,
+    rgb, BG_CARD, TEXT, TEXT_DIM, ACCENT, GREEN, PINK,
+    RADIUS, CardView, avenir_heavy, avenir_medium, make_label,
 )
 from tak.ui.splash_macos import BarView, is_model_cached, download_model
 
@@ -46,9 +46,13 @@ def load_config() -> TakConfig:
     _register_defaults()
     defaults = AppKit.NSUserDefaults.standardUserDefaults()
     device_val = int(defaults.integerForKey_(_KEY_DEVICE))
+    model = str(defaults.stringForKey_(_KEY_MODEL) or "turbo")
+    if model in _DEPRECATED_MODELS:
+        model = "small"
+        defaults.setObject_forKey_(model, _KEY_MODEL)
     return TakConfig(
         trigger_key=str(defaults.stringForKey_(_KEY_TRIGGER) or "alt_r"),
-        model=str(defaults.stringForKey_(_KEY_MODEL) or "turbo"),
+        model=model,
         use_clipboard=bool(defaults.boolForKey_(_KEY_CLIPBOARD)),
         audio_device=None if device_val < 0 else device_val,
     )
@@ -81,8 +85,6 @@ _TRIGGER_KEY_LABELS = [v for _, v in _TRIGGER_KEYS]
 # ─── Model display names ───────────────────────────────────────────────
 
 _MODEL_INFO = {
-    "tiny":     "tiny (~75 MB, fastest)",
-    "base":     "base (~140 MB, fast)",
     "small":    "small (~460 MB)",
     "medium":   "medium (~1.5 GB)",
     "large-v3": "large-v3 (~3 GB, most accurate)",
@@ -91,13 +93,193 @@ _MODEL_INFO = {
 
 # MLX Hub repo IDs (mirrors tak.platforms.macos.MLX_MODELS)
 _MLX_MODELS = {
-    "tiny":     "mlx-community/whisper-tiny-mlx",
-    "base":     "mlx-community/whisper-base-mlx",
     "small":    "mlx-community/whisper-small-mlx",
     "medium":   "mlx-community/whisper-medium-mlx-fp32",
     "large-v3": "mlx-community/whisper-large-v3-mlx",
     "turbo":    "mlx-community/whisper-large-v3-turbo",
 }
+
+_DEPRECATED_MODELS = {"tiny", "base"}
+
+
+# ─── Model recommendation data ────────────────────────────────────────
+
+_MODEL_RECS = [
+    ("8 GB RAM (any chip)",     "small"),
+    ("16 GB RAM (M1 / M2)",     "turbo"),
+    ("16 GB+ RAM (M3 / M4)",    "turbo"),
+    ("24 GB+ RAM (Pro / Max)",  "large-v3"),
+]
+
+_LANG_TIP = "For Spanish or other non-English languages, prefer medium or larger for better accuracy."
+
+
+# ─── Info tooltip panel ───────────────────────────────────────────────
+
+_TIP_W, _TIP_H = 300, 220
+_TIP_PAD = 16
+
+
+class _TooltipCard(AppKit.NSView):
+    """Rounded semi-transparent card for the tooltip panel."""
+
+    def drawRect_(self, rect):
+        b = self.bounds()
+        path = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+            b, RADIUS, RADIUS
+        )
+        rgb(13, 17, 23, 0.95).set()
+        path.fill()
+        rgb(33, 38, 45, 0.6).set()
+        path.setLineWidth_(0.5)
+        path.stroke()
+
+
+class _InfoTooltipPanel:
+    """Floating info panel showing model recommendations."""
+
+    def __init__(self):
+        self._panel: Optional[AppKit.NSPanel] = None
+        self._global_monitor = None
+        self._local_monitor = None
+
+    def toggle(self, anchor_button, parent_window):
+        if self._panel and self._panel.isVisible():
+            self.dismiss()
+            return
+        self._build()
+        self._position_near(anchor_button, parent_window)
+        self._panel.orderFront_(None)
+        self._install_click_monitors()
+
+    def dismiss(self):
+        if self._panel:
+            self._panel.orderOut_(None)
+        self._remove_monitors()
+
+    def _build(self):
+        self._panel = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+            Foundation.NSMakeRect(0, 0, _TIP_W, _TIP_H),
+            AppKit.NSWindowStyleMaskBorderless | AppKit.NSWindowStyleMaskNonactivatingPanel,
+            AppKit.NSBackingStoreBuffered,
+            False,
+        )
+        self._panel.setLevel_(AppKit.NSFloatingWindowLevel + 1)
+        self._panel.setOpaque_(False)
+        self._panel.setBackgroundColor_(AppKit.NSColor.clearColor())
+        self._panel.setHasShadow_(True)
+        self._panel.setAppearance_(
+            AppKit.NSAppearance.appearanceNamed_("NSAppearanceNameDarkAqua")
+        )
+
+        card = _TooltipCard.alloc().initWithFrame_(
+            Foundation.NSMakeRect(0, 0, _TIP_W, _TIP_H)
+        )
+        self._panel.contentView().addSubview_(card)
+
+        cw = _TIP_W - 2 * _TIP_PAD
+        cy = _TIP_H - _TIP_PAD
+
+        # Title
+        cy -= 18
+        title = make_label("Choosing a Model", 14, bold=True, color=TEXT)
+        title.setFrame_(Foundation.NSMakeRect(_TIP_PAD, cy, cw, 18))
+        card.addSubview_(title)
+        cy -= 18
+
+        # Table header
+        cy -= 14
+        hdr_setup = make_label("Setup", 10, color=TEXT_DIM)
+        hdr_setup.setFrame_(Foundation.NSMakeRect(_TIP_PAD, cy, 160, 14))
+        card.addSubview_(hdr_setup)
+        hdr_model = make_label("Model", 10, color=TEXT_DIM)
+        hdr_model.setFrame_(Foundation.NSMakeRect(_TIP_PAD + 164, cy, cw - 164, 14))
+        card.addSubview_(hdr_model)
+        cy -= 6
+
+        # Header separator
+        sep = AppKit.NSView.alloc().initWithFrame_(
+            Foundation.NSMakeRect(_TIP_PAD, cy, cw, 1)
+        )
+        sep.setWantsLayer_(True)
+        sep.layer().setBackgroundColor_(rgb(33, 38, 45, 0.6).CGColor())
+        card.addSubview_(sep)
+        cy -= 6
+
+        # Recommendation rows
+        for setup_label, model_key in _MODEL_RECS:
+            cy -= 18
+            setup_lbl = make_label(setup_label, 11, color=TEXT)
+            setup_lbl.setFrame_(Foundation.NSMakeRect(_TIP_PAD, cy, 160, 18))
+            card.addSubview_(setup_lbl)
+            model_lbl = make_label(model_key, 11, bold=True, color=ACCENT)
+            model_lbl.setFrame_(Foundation.NSMakeRect(_TIP_PAD + 164, cy, cw - 164, 18))
+            card.addSubview_(model_lbl)
+            cy -= 2
+
+        # Separator before tip
+        cy -= 8
+        sep2 = AppKit.NSView.alloc().initWithFrame_(
+            Foundation.NSMakeRect(_TIP_PAD, cy, cw, 1)
+        )
+        sep2.setWantsLayer_(True)
+        sep2.layer().setBackgroundColor_(rgb(33, 38, 45, 0.6).CGColor())
+        card.addSubview_(sep2)
+        cy -= 8
+
+        # Language tip
+        tip = AppKit.NSTextField.wrappingLabelWithString_(_LANG_TIP)
+        tip.setFont_(avenir_medium(10))
+        tip.setTextColor_(PINK)
+        tip.setBezeled_(False)
+        tip.setDrawsBackground_(False)
+        tip.setEditable_(False)
+        tip.setSelectable_(False)
+        tip.setFrame_(Foundation.NSMakeRect(_TIP_PAD, _TIP_PAD, cw, cy - _TIP_PAD))
+        card.addSubview_(tip)
+
+    def _position_near(self, button, parent_window):
+        btn_rect = button.convertRect_toView_(button.bounds(), None)
+        win_frame = parent_window.frame()
+        screen_x = win_frame.origin.x + btn_rect.origin.x
+        screen_y = win_frame.origin.y + btn_rect.origin.y - _TIP_H - 4
+
+        screen = AppKit.NSScreen.mainScreen().visibleFrame()
+        if screen_x + _TIP_W > screen.origin.x + screen.size.width:
+            screen_x = screen.origin.x + screen.size.width - _TIP_W - 8
+        if screen_y < screen.origin.y:
+            screen_y = win_frame.origin.y + btn_rect.origin.y + btn_rect.size.height + 4
+
+        self._panel.setFrameOrigin_(Foundation.NSMakePoint(screen_x, screen_y))
+
+    def _install_click_monitors(self):
+        def _handle_global(event):
+            if self._panel and self._panel.isVisible():
+                click_loc = AppKit.NSEvent.mouseLocation()
+                if not AppKit.NSMouseInRect(click_loc, self._panel.frame(), False):
+                    self.dismiss()
+
+        def _handle_local(event):
+            if self._panel and self._panel.isVisible():
+                click_loc = AppKit.NSEvent.mouseLocation()
+                if not AppKit.NSMouseInRect(click_loc, self._panel.frame(), False):
+                    self.dismiss()
+            return event
+
+        self._global_monitor = AppKit.NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(
+            AppKit.NSLeftMouseDownMask, _handle_global
+        )
+        self._local_monitor = AppKit.NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
+            AppKit.NSLeftMouseDownMask, _handle_local
+        )
+
+    def _remove_monitors(self):
+        if self._global_monitor:
+            AppKit.NSEvent.removeMonitor_(self._global_monitor)
+            self._global_monitor = None
+        if self._local_monitor:
+            AppKit.NSEvent.removeMonitor_(self._local_monitor)
+            self._local_monitor = None
 
 
 # ─── Borderless panel that accepts keyboard focus ─────────────────────
@@ -210,7 +392,40 @@ class SettingsWindow(AppKit.NSObject):
 
         # Whisper Model
         cy -= 26
-        self._add_row_label(card, "Whisper Model", _PAD, cy, label_w)
+        info_btn_size = 16
+        model_label_w = label_w - info_btn_size - 4
+        model_label = make_label("Whisper Model", 13, color=TEXT_DIM)
+        model_label.setFrame_(Foundation.NSMakeRect(_PAD, cy, model_label_w, 18))
+        model_label.setAlignment_(AppKit.NSTextAlignmentRight)
+        card.addSubview_(model_label)
+
+        self._info_btn = AppKit.NSButton.alloc().initWithFrame_(
+            Foundation.NSMakeRect(
+                _PAD + model_label_w + 4, cy + 1,
+                info_btn_size, info_btn_size,
+            )
+        )
+        self._info_btn.setBordered_(False)
+        self._info_btn.setWantsLayer_(True)
+        self._info_btn.layer().setCornerRadius_(info_btn_size / 2)
+        self._info_btn.layer().setBackgroundColor_(rgb(33, 38, 45, 0.8).CGColor())
+        self._info_btn.setAttributedTitle_(
+            AppKit.NSAttributedString.alloc().initWithString_attributes_(
+                "i",
+                {
+                    AppKit.NSFontAttributeName: AppKit.NSFont.fontWithName_size_(
+                        "Avenir-MediumOblique", 9
+                    ) or avenir_medium(9),
+                    AppKit.NSForegroundColorAttributeName: TEXT_DIM,
+                },
+            )
+        )
+        self._info_btn.setTarget_(self)
+        self._info_btn.setAction_("onInfoToggle:")
+        card.addSubview_(self._info_btn)
+
+        self._info_tooltip = _InfoTooltipPanel()
+
         self._model_popup = self._add_popup(card, control_x, cy, control_w)
         for key in _MODEL_INFO:
             self._model_popup.addItemWithTitle_(_MODEL_INFO[key])
@@ -474,7 +689,12 @@ class SettingsWindow(AppKit.NSObject):
 
     @objc.typedSelector(b"v@:@")
     def closePanel_(self, sender):
+        self._info_tooltip.dismiss()
         self._panel.orderOut_(None)
+
+    @objc.typedSelector(b"v@:@")
+    def onInfoToggle_(self, sender):
+        self._info_tooltip.toggle(self._info_btn, self._panel)
 
     @objc.typedSelector(b"v@:@")
     def onDonate_(self, sender):
