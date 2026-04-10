@@ -22,8 +22,6 @@ from tak.app import (
 
 # ─── MLX Hub model mapping ──────────────────────────────────────────────
 MLX_MODELS = {
-    "tiny":     "mlx-community/whisper-tiny-mlx",
-    "base":     "mlx-community/whisper-base-mlx",
     "small":    "mlx-community/whisper-small-mlx",
     "medium":   "mlx-community/whisper-medium-mlx-fp32",
     "large-v3": "mlx-community/whisper-large-v3-mlx",
