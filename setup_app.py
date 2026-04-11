@@ -13,64 +13,15 @@ import os
 import subprocess
 import sys
 
-# Locate mlx native libraries
-SITE_PACKAGES = os.path.join(
-    os.path.dirname(sys.executable), "..", "lib",
-    f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages",
-)
-SITE_PACKAGES = os.path.normpath(SITE_PACKAGES)
-
-MLX_LIB = os.path.join(SITE_PACKAGES, "mlx", "lib")
-SOUNDDEVICE_DATA = os.path.join(SITE_PACKAGES, "_sounddevice_data")
+SPEC_FILE = os.path.join(os.path.dirname(__file__), "TAK.spec")
 
 cmd = [
     sys.executable, "-m", "PyInstaller",
-    "--name", "TAK",
-    "--windowed",                     # .app bundle, no console
-    "--icon", "resources/tak.icns",
-    "--osx-bundle-identifier", "com.tak.app",
-
-    # ── Collect packages ─────────────────────────────────────────
-    "--collect-all", "mlx",
-    "--collect-all", "mlx_whisper",
-    "--collect-all", "pynput",
-
-    # ── Hidden imports ───────────────────────────────────────────
-    "--hidden-import", "AppKit",
-    "--hidden-import", "Foundation",
-    "--hidden-import", "objc",
-    "--hidden-import", "sounddevice",
-    "--hidden-import", "numpy",
-
-    # ── Native libraries ─────────────────────────────────────────
-    "--add-binary", f"{MLX_LIB}/libmlx.dylib:mlx/lib",
-    "--add-data", f"{MLX_LIB}/mlx.metallib:mlx/lib",
-
-    # ── Excludes (save ~500MB) ───────────────────────────────────
-    "--exclude-module", "torch",
-    "--exclude-module", "torchaudio",
-    "--exclude-module", "torchvision",
-    "--exclude-module", "faster_whisper",
-    "--exclude-module", "ctranslate2",
-    "--exclude-module", "onnxruntime",
-    "--exclude-module", "PIL",
-    "--exclude-module", "tkinter",
-
-    # ── Entry point ──────────────────────────────────────────────
-    "tak/gui_main.py",
+    "--noconfirm",
+    SPEC_FILE,
 ]
 
-# Add sounddevice portaudio if present
-if os.path.isdir(SOUNDDEVICE_DATA):
-    cmd.insert(-1, "--add-data")
-    cmd.insert(-1, f"{SOUNDDEVICE_DATA}:_sounddevice_data")
-
-# Add Info.plist overrides via environment
-os.environ["PYINSTALLER_PLIST_EXTRA"] = ""  # handled post-build
-
-print("Building TAK.app with PyInstaller...")
-print(f"  Site-packages: {SITE_PACKAGES}")
-print(f"  MLX lib: {MLX_LIB}")
+print("Building TAK.app with PyInstaller (TAK.spec)...")
 result = subprocess.run(cmd)
 
 if result.returncode == 0:
@@ -109,6 +60,7 @@ if result.returncode == 0:
     print("Ad-hoc code signed.")
 
     print(f"\nDone! App bundle at: dist/TAK.app")
+    print("To create a signed DMG for distribution: python ship_dmg.py")
 else:
     print(f"\nBuild failed with exit code {result.returncode}", file=sys.stderr)
 
