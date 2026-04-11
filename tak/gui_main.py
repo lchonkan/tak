@@ -157,6 +157,52 @@ def main():
                 fn()
         return _call
 
+    # Accessibility gate — checked on each trigger key press.
+    # Once confirmed, remembers for the rest of the session.
+    _accessibility_confirmed = not _needs_accessibility
+    _showing_alert = False
+
+    def _check_accessibility() -> bool:
+        nonlocal _accessibility_confirmed, _showing_alert
+        if _accessibility_confirmed:
+            return True
+        if ApplicationServices.AXIsProcessTrusted():
+            _accessibility_confirmed = True
+            logging.info("Accessibility permission confirmed for session")
+            menubar.clear_needs_accessibility()
+            return True
+        # Not granted — show confirmation dialog on the main thread.
+        # Guard against re-entrant alerts (user holds key while dialog is up).
+        if _showing_alert:
+            return False
+        _showing_alert = True
+        logging.info("Accessibility not granted on key press — showing dialog")
+
+        def _show_alert():
+            nonlocal _showing_alert
+            ns_app.activateIgnoringOtherApps_(True)
+            alert = AppKit.NSAlert.alloc().init()
+            alert.setMessageText_("Accessibility Permission Required")
+            alert.setInformativeText_(
+                "TAK needs Accessibility permission to detect your "
+                "push-to-talk key and paste transcribed text.\n\n"
+                "Please enable TAK in System Settings \u2192 Privacy & Security "
+                "\u2192 Accessibility."
+            )
+            alert.addButtonWithTitle_("Open System Settings")
+            alert.addButtonWithTitle_("Cancel")
+            response = alert.runModal()
+            if response == AppKit.NSAlertFirstButtonReturn:
+                import subprocess
+                subprocess.Popen([
+                    "open",
+                    "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+                ])
+            _showing_alert = False
+
+        AppKit.NSOperationQueue.mainQueue().addOperationWithBlock_(_show_alert)
+        return False
+
     # Build and run app
     app = TakApp(
         trigger_key=trigger_key,
@@ -169,30 +215,11 @@ def main():
         on_recording=_combine(overlay.show_recording, menubar.set_recording),
         on_transcribing=_combine(overlay.show_transcribing, menubar.set_transcribing),
         on_idle=_combine(overlay.hide, menubar.set_idle),
+        accessibility_check=_check_accessibility if _needs_accessibility else None,
     )
 
-    # If accessibility wasn't granted at launch, poll every 2s until it is,
-    # then restart the key listener so pynput picks up the new permission.
     if _needs_accessibility:
-        import objc
-
-        class _AccessibilityPoller(Foundation.NSObject):
-            @objc.python_method
-            def initWithApp_(self, tak_app):
-                self = objc.super(_AccessibilityPoller, self).init()
-                self._tak_app = tak_app
-                return self
-
-            def check_(self, timer):
-                if ApplicationServices.AXIsProcessTrusted():
-                    timer.invalidate()
-                    logging.info("Accessibility permission granted — restarting key listener")
-                    self._tak_app.restart_listener()
-
-        _poller = _AccessibilityPoller.alloc().initWithApp_(app)
-        Foundation.NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-            2.0, _poller, _poller.check_, None, True,
-        )
+        menubar.set_needs_accessibility()
 
     logging.info("TAK ready — trigger=%s model=%s", config.trigger_key, config.model)
     app.run(main_loop=run_app_loop)

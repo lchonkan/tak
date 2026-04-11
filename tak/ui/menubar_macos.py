@@ -110,6 +110,7 @@ def _make_mic_icon_with_dot(
 
 _RED = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.9, 0.2, 0.2, 1.0)
 _YELLOW = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.85, 0.65, 0.1, 1.0)
+_ORANGE = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(1.0, 0.6, 0.0, 1.0)
 
 
 # ─── Menu bar controller ───────────────────────────────────────────────
@@ -186,7 +187,51 @@ class MacMenuBar(AppKit.NSObject):
 
         self._status_item.setMenu_(menu)
 
+    # ── Accessibility state ─────────────────────────────────────────
+
+    def set_needs_accessibility(self) -> None:
+        """Show that accessibility permission is required."""
+        self._icon_warning = _make_mic_icon_with_dot(dot_color=_ORANGE)
+
+        def _inner():
+            self._status_item.button().setImage_(self._icon_warning)
+            self._status_label.setTitle_("Accessibility Required")
+
+            # Insert "Grant Accessibility…" item after the status label
+            if not hasattr(self, "_accessibility_item"):
+                menu = self._status_item.menu()
+                self._accessibility_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                    "Grant Accessibility\u2026", "openAccessibility:", ""
+                )
+                self._accessibility_item.setTarget_(self)
+                menu.insertItem_atIndex_(self._accessibility_item, 1)
+
+        if AppKit.NSThread.isMainThread():
+            _inner()
+        else:
+            AppKit.NSOperationQueue.mainQueue().addOperationWithBlock_(_inner)
+
+    def clear_needs_accessibility(self) -> None:
+        """Remove the accessibility warning and restore idle state."""
+        def _inner():
+            if hasattr(self, "_accessibility_item"):
+                self._status_item.menu().removeItem_(self._accessibility_item)
+                del self._accessibility_item
+            self.set_idle()
+
+        if AppKit.NSThread.isMainThread():
+            _inner()
+        else:
+            AppKit.NSOperationQueue.mainQueue().addOperationWithBlock_(_inner)
+
     # ── Menu actions ────────────────────────────────────────────────
+
+    @objc.typedSelector(b"v@:@")
+    def openAccessibility_(self, sender):
+        import subprocess
+        subprocess.Popen([
+            "open", "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ])
 
     @objc.typedSelector(b"v@:@")
     def openSettings_(self, sender):

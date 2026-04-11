@@ -148,6 +148,7 @@ class TakApp:
         on_recording: Optional[Callable[[], None]] = None,
         on_transcribing: Optional[Callable[[], None]] = None,
         on_idle: Optional[Callable[[], None]] = None,
+        accessibility_check: Optional[Callable[[], bool]] = None,
     ):
         self.trigger_key = trigger_key
         self.recorder = recorder
@@ -162,10 +163,13 @@ class TakApp:
         self._on_recording = on_recording or (lambda: None)
         self._on_transcribing = on_transcribing or (lambda: None)
         self._on_idle = on_idle or (lambda: None)
+        self._accessibility_check = accessibility_check
 
     def _on_press(self, key):
         """Handle key press — start recording."""
         if key == self.trigger_key and not self._pressed:
+            if self._accessibility_check and not self._accessibility_check():
+                return
             with self._lock:
                 if self._processing:
                     return  # still transcribing previous clip
