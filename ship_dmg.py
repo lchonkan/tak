@@ -26,6 +26,7 @@ import tempfile
 
 APP_PATH = os.path.join("dist", "TAK.app")
 DMG_PATH = os.path.join("dist", "TAK.dmg")
+ENTITLEMENTS = os.path.join(os.path.dirname(__file__), "TAK.entitlements")
 NOTARY_PROFILE = "TAK"
 
 
@@ -38,13 +39,13 @@ def sign_app(identity):
     """Deep-sign the .app bundle with a Developer ID certificate."""
     print(f"\nSigning with: {identity}")
 
-    # Sign all nested frameworks/dylibs first (--deep is unreliable for notarization)
-    # Then sign the top-level bundle with hardened runtime
+    # Sign the bundle with hardened runtime + entitlements for JIT (llvmlite/numba)
     run([
         "codesign", "--force", "--options", "runtime",
         "--sign", identity,
         "--deep",
         "--timestamp",
+        "--entitlements", ENTITLEMENTS,
         APP_PATH,
     ])
     print("Signed.")
