@@ -72,7 +72,17 @@ All crypto goes directly to the maintainer's wallets. Full details: [docs/donati
 
 ## Installation
 
-### Quick Install (macOS and Linux)
+### macOS App (Recommended)
+
+Download the latest signed and notarized DMG:
+
+**[Download TAK.dmg](https://github.com/lchonkan/tak/releases/latest/download/TAK.dmg)**
+
+Open the disk image, drag TAK into Applications, and launch. Grant Accessibility and Microphone permissions when prompted. The speech model (~1.5 GB) downloads automatically on first launch.
+
+Requires macOS 13+ and Apple Silicon (M1/M2/M3/M4).
+
+### Quick Install from Source (macOS and Linux)
 
 ```bash
 git clone https://github.com/lchonkan/tak.git
@@ -400,8 +410,8 @@ export HF_ENDPOINT=https://hf-mirror.com
 
 ## TODO
 
-- [ ] Apple Developer ID code signing and notarization for Gatekeeper-ready distribution
-- [ ] DMG installer packaging
+- [x] Apple Developer ID code signing and notarization for Gatekeeper-ready distribution
+- [x] DMG installer packaging
 - [ ] Auto-launch on login (Launch Agent / Login Item)
 - [ ] Wayland support (Linux)
 - [ ] Windows support
