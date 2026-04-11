@@ -1,8 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os, sys
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('/opt/anaconda3/envs/tak/lib/python3.11/site-packages/mlx/lib/mlx.metallib', 'mlx/lib'), ('/opt/anaconda3/envs/tak/lib/python3.11/site-packages/_sounddevice_data', '_sounddevice_data')]
-binaries = [('/opt/anaconda3/envs/tak/lib/python3.11/site-packages/mlx/lib/libmlx.dylib', 'mlx/lib')]
+# Resolve site-packages from the active Python environment
+_sp = os.path.join(os.path.dirname(sys.executable), '..', 'lib',
+                   f'python{sys.version_info.major}.{sys.version_info.minor}', 'site-packages')
+_sp = os.path.normpath(_sp)
+_mlx_lib = os.path.join(_sp, 'mlx', 'lib')
+_sd_data = os.path.join(_sp, '_sounddevice_data')
+
+datas = [
+    (os.path.join(_mlx_lib, 'mlx.metallib'), 'mlx/lib'),
+]
+if os.path.isdir(_sd_data):
+    datas.append((_sd_data, '_sounddevice_data'))
+
+binaries = [(os.path.join(_mlx_lib, 'libmlx.dylib'), 'mlx/lib')]
 hiddenimports = ['AppKit', 'Foundation', 'objc', 'sounddevice', 'numpy']
 tmp_ret = collect_all('mlx')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]

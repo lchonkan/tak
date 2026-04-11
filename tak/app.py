@@ -218,6 +218,15 @@ class TakApp:
                 self._processing = False
             self._on_idle()
 
+    def restart_listener(self):
+        """Stop and restart the pynput key listener."""
+        self._listener.stop()
+        self._listener = keyboard.Listener(
+            on_press=self._on_press,
+            on_release=self._on_release,
+        )
+        self._listener.start()
+
     def run(self, main_loop: Optional[Callable[[], None]] = None):
         """Start the application.
 
@@ -237,21 +246,21 @@ class TakApp:
         print(f"  {C.DIM}Press Ctrl+C to quit.{C.RESET}")
         print()
 
-        listener = keyboard.Listener(
+        self._listener = keyboard.Listener(
             on_press=self._on_press,
             on_release=self._on_release,
         )
-        listener.start()
+        self._listener.start()
 
         try:
             if main_loop:
                 main_loop()
             else:
-                listener.join()
+                self._listener.join()
         except KeyboardInterrupt:
             print(f"\n  {C.DIM}Bye! 👋{C.RESET}\n")
         finally:
-            listener.stop()
+            self._listener.stop()
 
 
 # ─── CLI ────────────────────────────────────────────────────────────────

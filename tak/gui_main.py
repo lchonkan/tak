@@ -1,7 +1,7 @@
 """TAK GUI entry point — macOS .app bundle launcher.
 
 This replaces CLI argument parsing with NSUserDefaults-backed config.
-Used by py2app as the main script for TAK.app.
+Used by PyInstaller (TAK.spec) as the main script for TAK.app.
 """
 
 from __future__ import annotations
@@ -62,29 +62,15 @@ def main():
 
     # Prompt for Accessibility permission if not yet granted.
     # AXIsProcessTrustedWithOptions with kAXTrustedCheckOptionPrompt shows
-    # a system alert directing the user to System Settings > Accessibility.
-    # The permission only takes effect after a restart, so if not granted
-    # we show an alert and quit so the user can relaunch.
+    # the system dialog directing the user to System Settings > Accessibility.
+    # The app continues launching regardless — pynput silently ignores key
+    # events until the permission is granted (no restart needed).
     import ApplicationServices
     from Foundation import NSDictionary
     opts = NSDictionary.dictionaryWithObject_forKey_(True, "AXTrustedCheckOptionPrompt")
-    if not ApplicationServices.AXIsProcessTrustedWithOptions(opts):
-        logging.warning("Accessibility permission not yet granted — asking user to relaunch")
-        import AppKit
-        ns_app = AppKit.NSApplication.sharedApplication()
-        ns_app.setActivationPolicy_(AppKit.NSApplicationActivationPolicyRegular)
-        ns_app.activateIgnoringOtherApps_(True)
-        alert = AppKit.NSAlert.alloc().init()
-        alert.setMessageText_("Accessibility Permission Required")
-        alert.setInformativeText_(
-            "TAK needs Accessibility access to listen for your trigger key.\n\n"
-            "Please enable TAK in:\n"
-            "System Settings \u2192 Privacy & Security \u2192 Accessibility\n\n"
-            "Then reopen TAK."
-        )
-        alert.addButtonWithTitle_("Quit")
-        alert.runModal()
-        sys.exit(0)
+    _needs_accessibility = not ApplicationServices.AXIsProcessTrustedWithOptions(opts)
+    if _needs_accessibility:
+        logging.info("Accessibility permission not yet granted — system prompt shown, continuing launch")
 
     backend.adjust_key_map()
     logging.info("Platform setup done")
@@ -184,6 +170,29 @@ def main():
         on_transcribing=_combine(overlay.show_transcribing, menubar.set_transcribing),
         on_idle=_combine(overlay.hide, menubar.set_idle),
     )
+
+    # If accessibility wasn't granted at launch, poll every 2s until it is,
+    # then restart the key listener so pynput picks up the new permission.
+    if _needs_accessibility:
+        import objc
+
+        class _AccessibilityPoller(Foundation.NSObject):
+            @objc.python_method
+            def initWithApp_(self, tak_app):
+                self = objc.super(_AccessibilityPoller, self).init()
+                self._tak_app = tak_app
+                return self
+
+            def check_(self, timer):
+                if ApplicationServices.AXIsProcessTrusted():
+                    timer.invalidate()
+                    logging.info("Accessibility permission granted — restarting key listener")
+                    self._tak_app.restart_listener()
+
+        _poller = _AccessibilityPoller.alloc().initWithApp_(app)
+        Foundation.NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            2.0, _poller, _poller.check_, None, True,
+        )
 
     logging.info("TAK ready — trigger=%s model=%s", config.trigger_key, config.model)
     app.run(main_loop=run_app_loop)
