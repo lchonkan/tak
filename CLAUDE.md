@@ -80,8 +80,9 @@ tak/                            # Python package
 | `tak/ui/settings_macos.py` | Preferences window | Borderless panel for trigger key, model, audio device, clipboard toggle. Persists to `NSUserDefaults`. Shows inline model download progress. Shows restart-required modal after changes. |
 | `tak/ui/splash_macos.py` | Download splash | Full-screen overlay shown during initial model download with progress bar, speed, and ETA. |
 | `run.sh` | Launcher | Activates conda env, sets CUDA paths on Linux only, runs `python -m tak`. |
-| `TAK.spec` | PyInstaller spec | Builds macOS `.app` bundle via `pyinstaller TAK.spec`. |
-| `setup_app.py` | App bundle setup | Post-build script for code signing and packaging. |
+| `TAK.spec` | PyInstaller spec | Builds macOS `.app` bundle via `pyinstaller TAK.spec`. Contains BUNDLE step that creates `TAK.app`. All build config (datas, binaries, hidden imports, excludes) lives here — `setup_app.py` just invokes it. |
+| `setup_app.py` | App bundle build | Runs `pyinstaller TAK.spec`, then patches Info.plist and ad-hoc code signs the bundle. This is the single command to build: `python setup_app.py`. |
+| `ship_dmg.py` | Distribution | Signs the app with Developer ID, creates a DMG with Applications symlink, and notarizes with Apple. Run after `setup_app.py`. |
 
 ### Design rules
 
@@ -98,6 +99,31 @@ tak/                            # Python package
 2. Add the platform branch in `tak/__main__.py`
 3. Create `requirements-<platform>.txt`
 4. Do not modify `tak/app.py` or existing platform files
+
+## App Bundle Build
+
+The macOS `.app` bundle is built with PyInstaller. The single build command is:
+
+```bash
+conda activate tak
+python setup_app.py
+```
+
+This runs `pyinstaller TAK.spec`, patches Info.plist, and ad-hoc code signs the bundle. Output: `dist/TAK.app`.
+
+### Build rules
+
+- **All build config lives in `TAK.spec`** — datas, binaries, hidden imports, excludes, and the BUNDLE step. `setup_app.py` only invokes the spec and runs post-build steps (Info.plist patching, code signing).
+- **Never bypass `TAK.spec`** by passing CLI flags to PyInstaller directly. The spec file contains the BUNDLE step that creates the `.app` wrapper. Without it, PyInstaller only produces a bare `dist/TAK/` directory.
+- **Paths in `TAK.spec` must be dynamic** — resolved from the active Python environment at build time, never hardcoded to a specific conda path.
+- **After building, always verify** that `dist/TAK.app/Contents/` exists (not just `dist/TAK/`).
+- **After any change to `gui_main.py` or build files**, rebuild and launch the `.app` to verify it works. Check `~/Library/Logs/TAK/tak.log` for errors.
+
+### macOS permissions model
+
+- The `.app` bundle requires Accessibility and Microphone permissions.
+- **Never quit the app when accessibility is not granted.** Instead, trigger the system prompt (`AXIsProcessTrustedWithOptions` with `kAXTrustedCheckOptionPrompt`) and continue launching. Use an `NSTimer` to poll `AXIsProcessTrusted()` and restart the pynput listener when permission arrives. This avoids a quit/relaunch loop where macOS keeps revoking permissions on each new code signature.
+- pynput silently ignores key events when accessibility is missing — it does not crash. The listener just needs to be restarted after permission is granted mid-session.
 
 ## Code Style
 
@@ -117,6 +143,8 @@ tak/                            # Python package
 
 ## Running and Testing
 
+### Terminal (CLI)
+
 ```bash
 ./run.sh                    # default config
 ./run.sh --cpu              # CPU-only (no GPU)
@@ -125,5 +153,24 @@ tak/                            # Python package
 ./run.sh --model small      # smaller/faster model
 python -m tak --help        # direct invocation (after conda activate tak)
 ```
+
+### App bundle (macOS)
+
+```bash
+python setup_app.py         # build dist/TAK.app + dist/TAK.dmg
+open dist/TAK.app           # launch locally
+tail -f ~/Library/Logs/TAK/tak.log  # watch logs
+```
+
+The `.app` bundle logs to `~/Library/Logs/TAK/tak.log` (stdout/stderr are redirected there). Always check this log when debugging app bundle issues.
+
+### Shipping (signed DMG)
+
+```bash
+python setup_app.py         # 1. build dist/TAK.app (ad-hoc signed, for local dev)
+python ship_dmg.py          # 2. sign with Developer ID, create DMG, notarize
+```
+
+`ship_dmg.py` requires a "Developer ID Application" certificate and accepts `--identity` or `CODESIGN_IDENTITY` env var. Use `--skip-notarize` to sign without submitting to Apple. See `python ship_dmg.py --help` for details.
 
 There are no automated tests yet. Verify changes manually using the commands above and the verification checklists in `docs/macos-implementation-plan.md`.

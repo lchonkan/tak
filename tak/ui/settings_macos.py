@@ -698,7 +698,9 @@ class SettingsWindow(AppKit.NSObject):
 
     @objc.typedSelector(b"v@:@")
     def onDonate_(self, sender):
-        pass  # placeholder — donation URL will be added later
+        import AppKit
+        url = Foundation.NSURL.URLWithString_("https://github.com/lchonkan/tak/blob/main/docs/donations.md")
+        AppKit.NSWorkspace.sharedWorkspace().openURL_(url)
 
     @objc.typedSelector(b"v@:@")
     def onSettingChanged_(self, sender):

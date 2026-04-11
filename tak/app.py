@@ -148,6 +148,7 @@ class TakApp:
         on_recording: Optional[Callable[[], None]] = None,
         on_transcribing: Optional[Callable[[], None]] = None,
         on_idle: Optional[Callable[[], None]] = None,
+        accessibility_check: Optional[Callable[[], bool]] = None,
     ):
         self.trigger_key = trigger_key
         self.recorder = recorder
@@ -162,10 +163,13 @@ class TakApp:
         self._on_recording = on_recording or (lambda: None)
         self._on_transcribing = on_transcribing or (lambda: None)
         self._on_idle = on_idle or (lambda: None)
+        self._accessibility_check = accessibility_check
 
     def _on_press(self, key):
         """Handle key press — start recording."""
         if key == self.trigger_key and not self._pressed:
+            if self._accessibility_check and not self._accessibility_check():
+                return
             with self._lock:
                 if self._processing:
                     return  # still transcribing previous clip
@@ -218,6 +222,15 @@ class TakApp:
                 self._processing = False
             self._on_idle()
 
+    def restart_listener(self):
+        """Stop and restart the pynput key listener."""
+        self._listener.stop()
+        self._listener = keyboard.Listener(
+            on_press=self._on_press,
+            on_release=self._on_release,
+        )
+        self._listener.start()
+
     def run(self, main_loop: Optional[Callable[[], None]] = None):
         """Start the application.
 
@@ -237,21 +250,21 @@ class TakApp:
         print(f"  {C.DIM}Press Ctrl+C to quit.{C.RESET}")
         print()
 
-        listener = keyboard.Listener(
+        self._listener = keyboard.Listener(
             on_press=self._on_press,
             on_release=self._on_release,
         )
-        listener.start()
+        self._listener.start()
 
         try:
             if main_loop:
                 main_loop()
             else:
-                listener.join()
+                self._listener.join()
         except KeyboardInterrupt:
             print(f"\n  {C.DIM}Bye! 👋{C.RESET}\n")
         finally:
-            listener.stop()
+            self._listener.stop()
 
 
 # ─── CLI ────────────────────────────────────────────────────────────────
