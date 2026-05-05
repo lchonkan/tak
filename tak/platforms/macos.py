@@ -78,9 +78,13 @@ def type_text(text: str) -> bool:
             f'    keystroke "{escaped}"\n'
             'end tell'
         )
+        env = os.environ.copy()
+        env["LANG"] = "en_US.UTF-8"
         subprocess.run(
-            ["osascript", "-e", script],
+            ["osascript"],
+            input=script.encode("utf-8"),
             check=True, timeout=30, capture_output=True,
+            env=env,
         )
         return True
     except FileNotFoundError:
@@ -106,8 +110,10 @@ def type_text_clipboard(text: str) -> bool:
             capture_output=True, timeout=2,
         ).stdout
 
-        # Set new clipboard content
-        proc = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
+        # Set new clipboard content (ensure UTF-8 locale for non-ASCII text)
+        env = os.environ.copy()
+        env["LANG"] = "en_US.UTF-8"
+        proc = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE, env=env)
         proc.communicate(text.encode("utf-8"))
 
         # Paste with Cmd+V via CGEvents (uses Accessibility permission,
