@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import traceback
 from typing import Optional, Callable
 
 import numpy as np
@@ -10,7 +11,7 @@ from pynput import keyboard
 
 from tak.core.audio import BaseAudioRecorder, BaseTranscriber
 from tak.core.console import C, announce, banner, error, status, warn
-from tak.core.constants import WHISPER_RATE
+from tak.core.constants import MIN_RECORDING_SECONDS, WHISPER_RATE
 from tak.core.keymap import KEY_MAP
 
 
@@ -60,18 +61,21 @@ class TakApp:
 
     def _on_release(self, key):
         """Handle key release — stop recording, transcribe, type."""
-        if key == self.trigger_key and self._pressed:
-            self._pressed = False
-            audio = self.recorder.stop()
-
-            if audio is None or len(audio) < WHISPER_RATE * 0.3:
-                warn("Too short — skipped (hold key longer)")
-                self._on_idle()
+        if key != self.trigger_key:
+            return
+        with self._lock:
+            if not self._pressed:
                 return
+            self._pressed = False
+        audio = self.recorder.stop()
 
-            self._on_transcribing()
-            # Run transcription in a thread to avoid blocking the key listener
-            threading.Thread(target=self._process, args=(audio,), daemon=True).start()
+        if audio is None or len(audio) < WHISPER_RATE * MIN_RECORDING_SECONDS:
+            warn("Too short — skipped (hold key longer)")
+            self._on_idle()
+            return
+
+        self._on_transcribing()
+        threading.Thread(target=self._process, args=(audio,), daemon=True).start()
 
     def _process(self, audio: np.ndarray):
         """Transcribe and type the result."""
@@ -97,7 +101,7 @@ class TakApp:
             else:
                 warn("Could not type text — make sure a text field is focused")
         except Exception as e:
-            error(f"Transcription error: {e}")
+            error(f"Transcription error: {e}\n{traceback.format_exc()}")
         finally:
             with self._lock:
                 self._processing = False
