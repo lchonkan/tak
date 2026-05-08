@@ -76,7 +76,8 @@ def type_text_clipboard(text: str) -> bool:
     if not text.strip():
         return False
     try:
-        # Save current clipboard
+        # Save current clipboard. Note: xclip -o returns text only; non-text
+        # clipboard contents (images, files) are lost across the paste cycle.
         old_clip = subprocess.run(
             ["xclip", "-selection", "clipboard", "-o"],
             capture_output=True, text=True, timeout=2,
@@ -167,7 +168,7 @@ class LinuxAudioRecorder(BaseAudioRecorder):
         self._pw_proc: Optional[subprocess.Popen] = None
         self._tmp_path = os.path.join(
             os.environ.get("XDG_RUNTIME_DIR", "/tmp"),
-            "tak_recording.wav",
+            f"tak_recording_{os.getpid()}.wav",
         )
         # Ensure XDG_RUNTIME_DIR is set for PipeWire access
         if "XDG_RUNTIME_DIR" not in os.environ:
