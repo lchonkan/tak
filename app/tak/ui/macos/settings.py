@@ -11,7 +11,7 @@ import AppKit
 import Foundation
 
 from tak.core.config import TakConfig
-from tak.ui.design import (
+from tak.ui.macos.design import (
     rgb, BG_CARD, TEXT, TEXT_DIM, ACCENT, GREEN, PINK,
     RADIUS, CardView, avenir_heavy, avenir_medium, make_label,
 )

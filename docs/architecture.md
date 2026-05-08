@@ -78,7 +78,7 @@ TAK has two entry points (CLI and GUI), a platform-agnostic core, pluggable plat
 graph TD
     subgraph "Entry Points"
         EP_CLI["tak/__main__.py — CLI<br/>Platform detection · CLI args<br/>Backend wiring"]
-        EP_GUI["tak/gui_main.py — GUI<br/>macOS .app bundle<br/>NSUserDefaults config"]
+        EP_GUI["tak/ui/macos/gui_main.py — GUI<br/>macOS .app bundle<br/>NSUserDefaults config"]
     end
 
     subgraph "tak/core/app.py — Shared Core"
@@ -107,12 +107,12 @@ graph TD
         MAC_IF[platform_setup · get_default_model<br/>get_platform_label]
     end
 
-    subgraph "tak/ui/ — macOS UI Layer"
+    subgraph "tak/ui/macos/ — macOS UI Layer"
         DESIGN[design.py<br/>Colors · Fonts · CardView]
-        OVERLAY[macos/overlay.py<br/>Recording pill overlay]
-        MENUBAR[macos/menubar.py<br/>NSStatusItem · dropdown menu]
-        SETTINGS[macos/settings.py<br/>Preferences window<br/>NSUserDefaults persistence]
-        SPLASH[macos/splash.py<br/>Model download splash]
+        OVERLAY[overlay.py<br/>Recording pill overlay]
+        MENUBAR[menubar.py<br/>NSStatusItem · dropdown menu]
+        SETTINGS[settings.py<br/>Preferences window<br/>NSUserDefaults persistence]
+        SPLASH[splash.py<br/>Model download splash]
     end
 
     EP_CLI -->|imports| TAKAPP
@@ -142,12 +142,12 @@ graph TD
 
 ### Design Principles
 
-- **No `if IS_MACOS` inside core.** Platform branching happens only in entry points (`tak/__main__.py`, `tak/gui_main.py`).
+- **No `if IS_MACOS` inside core.** Platform branching happens only in entry points (`tak/__main__.py`, `tak/ui/macos/gui_main.py`).
 - **Two entry points.** `__main__.py` for CLI usage, `gui_main.py` for the macOS `.app` bundle (uses NSUserDefaults instead of CLI args).
 - **Constructor injection.** `TakApp` receives backends as arguments — it never imports a platform module.
 - **Each platform file is self-contained.** Deleting `tak/backend/linux.py` on a Mac causes no errors.
 - **Shared utilities in core.** Resampling, normalization, colors, constants, CLI parsing — all platform-agnostic.
-- **Shared design system.** `tak/ui/design.py` provides color tokens, fonts, and reusable views for all macOS UI components.
+- **Shared design system.** `tak/ui/macos/design.py` provides color tokens, fonts, and reusable views for all macOS UI components.
 
 ---
 
@@ -333,12 +333,12 @@ classDiagram
 | `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/backend/linux.py` |
 | `MacAudioRecorder`, `MacTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/backend/macos.py` |
 | CLI platform detection, backend wiring | `tak/__main__.py` |
-| GUI entry point, NSUserDefaults config, download splash | `tak/gui_main.py` |
+| GUI entry point, NSUserDefaults config, download splash | `tak/ui/macos/gui_main.py` |
 | `MacMenuBar` (NSStatusItem, dropdown menu) | `tak/ui/macos/menubar.py` |
 | `SettingsWindow` (preferences panel, NSUserDefaults persistence) | `tak/ui/macos/settings.py` |
 | `MacOverlay` (floating recording pill) | `tak/ui/macos/overlay.py` |
 | `DownloadSplash` (model download progress) | `tak/ui/macos/splash.py` |
-| Design tokens, `CardView`, `BarView`, font helpers | `tak/ui/design.py` |
+| Design tokens, `CardView`, `BarView`, font helpers | `tak/ui/macos/design.py` |
 
 ---
 
@@ -622,7 +622,7 @@ In GUI mode, all AppKit UI updates (overlay, menu bar, settings window) must hap
 
 ## CUDA Initialization (Linux Only)
 
-How TAK pre-loads NVIDIA libraries before the Whisper model is initialized. This runs on Linux only, triggered by `tak.platforms.linux.platform_setup()` during startup. For macOS, MLX handles GPU initialization automatically — see [platform-architecture.md](platform-architecture.md) for the full cross-platform comparison.
+How TAK pre-loads NVIDIA libraries before the Whisper model is initialized. This runs on Linux only, triggered by `tak.backend.linux.platform_setup()` during startup. For macOS, MLX handles GPU initialization automatically — see [platform-architecture.md](platform-architecture.md) for the full cross-platform comparison.
 
 ```mermaid
 sequenceDiagram
@@ -690,7 +690,7 @@ TAK is a **push-to-talk speech-to-text app**. Hold a key → record mic. Release
 ### Two entry points
 
 - **CLI** (`tak/__main__.py`): platform detection → builds backend → `TakApp.run()` → listener blocks main thread.
-- **GUI .app** (`tak/gui_main.py`): loads `TakConfig` from `NSUserDefaults` → wires menubar + overlay + splash → `TakApp.run(main_loop=NSApp.run)` so AppKit owns the main thread and pynput runs in a daemon thread.
+- **GUI .app** (`tak/ui/macos/gui_main.py`): loads `TakConfig` from `NSUserDefaults` → wires menubar + overlay + splash → `TakApp.run(main_loop=NSApp.run)` so AppKit owns the main thread and pynput runs in a daemon thread.
 
 ### Architecture diagram
 

@@ -10,12 +10,12 @@ macOS support is fully implemented, including a native `.app` bundle with menu b
 
 ```
 tak/__main__.py              → CLI entry point, platform detection, backend wiring
-tak/gui_main.py              → GUI entry point for macOS .app bundle
+tak/ui/macos/gui_main.py     → GUI entry point for macOS .app bundle
 tak/core/app.py              → shared: TakApp, base classes, CLI, colors, constants
 tak/core/config.py           → TakConfig dataclass (platform-agnostic settings)
 tak/backend/linux.py         → Linux: faster-whisper, PipeWire/ALSA, xdotool/xclip
 tak/backend/macos.py         → macOS: mlx-whisper, Core Audio, AppleScript
-tak/ui/design.py             → shared design system (colors, fonts, card views)
+tak/ui/macos/design.py       → macOS design system (colors, fonts, card views)
 tak/ui/macos/overlay.py      → floating recording/transcribing pill overlay
 tak/ui/macos/menubar.py      → macOS menu bar status item and dropdown
 tak/ui/macos/settings.py     → preferences window (NSUserDefaults persistence)
@@ -38,8 +38,8 @@ tak/ui/macos/splash.py       → model download splash screen
 | File | Status | Description |
 |------|--------|-------------|
 | `tak/core/config.py` | **✅ Done** | `TakConfig` dataclass for platform-agnostic settings |
-| `tak/gui_main.py` | **✅ Done** | GUI entry point for `.app` bundle (NSUserDefaults config, download splash) |
-| `tak/ui/design.py` | **✅ Done** | Shared design system — colors, fonts, `CardView`, `BarView` |
+| `tak/ui/macos/gui_main.py` | **✅ Done** | GUI entry point for `.app` bundle (NSUserDefaults config, download splash) |
+| `tak/ui/macos/design.py` | **✅ Done** | macOS design system — colors, fonts, `CardView`, `BarView` |
 | `tak/ui/macos/overlay.py` | **✅ Done** | Floating recording/transcribing pill overlay on all screens |
 | `tak/ui/macos/menubar.py` | **✅ Done** | `NSStatusItem` with mic icon, status display, Preferences/Uninstall/Quit menu |
 | `tak/ui/macos/settings.py` | **✅ Done** | Preferences window with trigger key, model, audio device, clipboard toggle. Inline model download progress. NSUserDefaults persistence. Restart-required modal. |

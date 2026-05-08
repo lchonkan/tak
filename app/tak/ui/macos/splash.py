@@ -10,7 +10,7 @@ import AppKit
 import Foundation
 import objc
 
-from tak.ui.design import (
+from tak.ui.macos.design import (
     BORDER, TEXT, TEXT_DIM, ACCENT,
     CardView, make_label,
 )
