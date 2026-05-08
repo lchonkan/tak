@@ -13,11 +13,9 @@ from typing import Optional
 import numpy as np
 import sounddevice as sd
 
-from tak.app import (
-    BaseAudioRecorder, BaseTranscriber,
-    WHISPER_RATE, CHANNELS, DTYPE, BLOCK_SIZE,
-    status, announce, warn, error, _resample, C,
-)
+from tak.core.audio import BaseAudioRecorder, BaseTranscriber, _resample
+from tak.core.console import C, announce, error, status, warn
+from tak.core.constants import BLOCK_SIZE, CHANNELS, DTYPE, WHISPER_RATE
 
 
 # ─── CUDA initialization ────────────────────────────────────────────────
@@ -78,7 +76,8 @@ def type_text_clipboard(text: str) -> bool:
     if not text.strip():
         return False
     try:
-        # Save current clipboard
+        # Save current clipboard. Note: xclip -o returns text only; non-text
+        # clipboard contents (images, files) are lost across the paste cycle.
         old_clip = subprocess.run(
             ["xclip", "-selection", "clipboard", "-o"],
             capture_output=True, text=True, timeout=2,
@@ -169,7 +168,7 @@ class LinuxAudioRecorder(BaseAudioRecorder):
         self._pw_proc: Optional[subprocess.Popen] = None
         self._tmp_path = os.path.join(
             os.environ.get("XDG_RUNTIME_DIR", "/tmp"),
-            "tak_recording.wav",
+            f"tak_recording_{os.getpid()}.wav",
         )
         # Ensure XDG_RUNTIME_DIR is set for PipeWire access
         if "XDG_RUNTIME_DIR" not in os.environ:
@@ -339,10 +338,13 @@ def platform_setup():
     """Run Linux-specific initialization."""
     ensure_cuda_libs()
 
+
 def get_default_model():
     """Default Whisper model for Linux."""
     return "medium"
 
+
 def get_platform_label():
     """Platform label for the banner."""
     return "Linux / X11"
+

@@ -44,15 +44,26 @@ esac
 info "Platform: ${BOLD}$OS $ARCH${RESET}"
 info "Install directory: ${BOLD}$SCRIPT_DIR${RESET}"
 
-# ─── Check for conda ────────────────────────────────────────────────────
+# ─── Check for conda / mamba / micromamba ───────────────────────────────
 step "Checking prerequisites..."
 
-if ! command -v conda &>/dev/null; then
-    fail "Conda not found. Install Miniconda first:"
+# Prefer faster solvers when available: micromamba > mamba > conda.
+if command -v micromamba &>/dev/null; then
+    PKG_MGR="micromamba"
+    PKG_HOOK='eval "$(micromamba shell hook -s bash)"'
+elif command -v mamba &>/dev/null; then
+    PKG_MGR="mamba"
+    PKG_HOOK='eval "$(conda shell.bash hook)"'
+elif command -v conda &>/dev/null; then
+    PKG_MGR="conda"
+    PKG_HOOK='eval "$(conda shell.bash hook)"'
+else
+    fail "Conda not found. Install Miniconda (or mamba/micromamba) first:"
     echo "    https://docs.anaconda.com/miniconda/"
+    echo "    https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html"
     exit 1
 fi
-ok "Conda found: $(conda --version)"
+ok "Using $PKG_MGR: $($PKG_MGR --version | head -1)"
 
 # ─── System dependencies ────────────────────────────────────────────────
 step "Installing system dependencies..."
@@ -99,16 +110,16 @@ step "Setting up Python environment..."
 
 ENV_NAME="tak"
 
-# Initialize conda for this script
-eval "$(conda shell.bash hook)"
+# Initialize the chosen package manager for this script
+eval "$PKG_HOOK"
 
-if conda env list | grep -q "^${ENV_NAME} "; then
-    ok "Conda environment '$ENV_NAME' already exists"
-    conda activate "$ENV_NAME"
+if $PKG_MGR env list | grep -q "^${ENV_NAME} "; then
+    ok "Environment '$ENV_NAME' already exists"
+    $PKG_MGR activate "$ENV_NAME"
 else
-    info "Creating conda environment '$ENV_NAME' (Python 3.11)..."
-    conda create -n "$ENV_NAME" python=3.11 -y -q
-    conda activate "$ENV_NAME"
+    info "Creating environment '$ENV_NAME' (Python 3.11) with $PKG_MGR..."
+    $PKG_MGR create -n "$ENV_NAME" python=3.11 -y -q
+    $PKG_MGR activate "$ENV_NAME"
     ok "Environment created and activated"
 fi
 

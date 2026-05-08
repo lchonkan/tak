@@ -2,7 +2,7 @@
 
 > **✅ Status: COMPLETED.** All deliverables have been implemented. This document is retained as a reference for the design decisions made during implementation.
 
-Development guide for adding macOS support to TAK. This work happened entirely in new files — no changes to `tak/app.py` or `tak/platforms/linux.py` were needed.
+Development guide for adding macOS support to TAK. This work happened entirely in new files — no changes to `tak/core/app.py` or `tak/backend/linux.py` are needed.
 
 ## Current State
 
@@ -10,16 +10,16 @@ macOS support is fully implemented, including a native `.app` bundle with menu b
 
 ```
 tak/__main__.py              → CLI entry point, platform detection, backend wiring
-tak/gui_main.py              → GUI entry point for macOS .app bundle
-tak/app.py                   → shared: TakApp, base classes, CLI, colors, constants
-tak/config.py                → TakConfig dataclass (platform-agnostic settings)
-tak/platforms/linux.py       → Linux: faster-whisper, PipeWire/ALSA, xdotool/xclip
-tak/platforms/macos.py       → macOS: mlx-whisper, Core Audio, AppleScript
-tak/ui/design.py             → shared design system (colors, fonts, card views)
-tak/ui/overlay_macos.py      → floating recording/transcribing pill overlay
-tak/ui/menubar_macos.py      → macOS menu bar status item and dropdown
-tak/ui/settings_macos.py     → preferences window (NSUserDefaults persistence)
-tak/ui/splash_macos.py       → model download splash screen
+tak/ui/macos/gui_main.py     → GUI entry point for macOS .app bundle
+tak/core/app.py              → shared: TakApp, base classes, CLI, colors, constants
+tak/core/config.py           → TakConfig dataclass (platform-agnostic settings)
+tak/backend/linux.py         → Linux: faster-whisper, PipeWire/ALSA, xdotool/xclip
+tak/backend/macos.py         → macOS: mlx-whisper, Core Audio, AppleScript
+tak/ui/macos/design.py       → macOS design system (colors, fonts, card views)
+tak/ui/macos/overlay.py      → floating recording/transcribing pill overlay
+tak/ui/macos/menubar.py      → macOS menu bar status item and dropdown
+tak/ui/macos/settings.py     → preferences window (NSUserDefaults persistence)
+tak/ui/macos/splash.py       → model download splash screen
 ```
 
 ## Deliverables
@@ -28,7 +28,7 @@ tak/ui/splash_macos.py       → model download splash screen
 
 | File | Status | Description |
 |------|--------|-------------|
-| `tak/platforms/macos.py` | **✅ Done** | macOS backends (mlx-whisper, Core Audio, AppleScript) |
+| `tak/backend/macos.py` | **✅ Done** | macOS backends (mlx-whisper, Core Audio, AppleScript) |
 | `requirements-macos.txt` | **✅ Done** | macOS Python dependencies |
 | `README.md` | **✅ Done** | macOS installation section, updated model table |
 | `docs/architecture.md` | **✅ Done** | macOS backend added to all diagrams |
@@ -37,18 +37,18 @@ tak/ui/splash_macos.py       → model download splash screen
 
 | File | Status | Description |
 |------|--------|-------------|
-| `tak/config.py` | **✅ Done** | `TakConfig` dataclass for platform-agnostic settings |
-| `tak/gui_main.py` | **✅ Done** | GUI entry point for `.app` bundle (NSUserDefaults config, download splash) |
-| `tak/ui/design.py` | **✅ Done** | Shared design system — colors, fonts, `CardView`, `BarView` |
-| `tak/ui/overlay_macos.py` | **✅ Done** | Floating recording/transcribing pill overlay on all screens |
-| `tak/ui/menubar_macos.py` | **✅ Done** | `NSStatusItem` with mic icon, status display, Preferences/Uninstall/Quit menu |
-| `tak/ui/settings_macos.py` | **✅ Done** | Preferences window with trigger key, model, audio device, clipboard toggle. Inline model download progress. NSUserDefaults persistence. Restart-required modal. |
-| `tak/ui/splash_macos.py` | **✅ Done** | Model download splash screen with progress bar, speed, and ETA |
+| `tak/core/config.py` | **✅ Done** | `TakConfig` dataclass for platform-agnostic settings |
+| `tak/ui/macos/gui_main.py` | **✅ Done** | GUI entry point for `.app` bundle (NSUserDefaults config, download splash) |
+| `tak/ui/macos/design.py` | **✅ Done** | macOS design system — colors, fonts, `CardView`, `BarView` |
+| `tak/ui/macos/overlay.py` | **✅ Done** | Floating recording/transcribing pill overlay on all screens |
+| `tak/ui/macos/menubar.py` | **✅ Done** | `NSStatusItem` with mic icon, status display, Preferences/Uninstall/Quit menu |
+| `tak/ui/macos/settings.py` | **✅ Done** | Preferences window with trigger key, model, audio device, clipboard toggle. Inline model download progress. NSUserDefaults persistence. Restart-required modal. |
+| `tak/ui/macos/splash.py` | **✅ Done** | Model download splash screen with progress bar, speed, and ETA |
 | `TAK.spec` | **✅ Done** | PyInstaller spec for building macOS `.app` bundle |
 | `setup_app.py` | **✅ Done** | Post-build script for `.app` bundle setup |
 | `resources/tak.icns` | **✅ Done** | macOS app icon |
 
-No changes were made to: `tak/app.py`, `tak/platforms/linux.py`.
+No changes are needed in: `tak/core/app.py`, `tak/backend/linux.py`.
 
 ---
 
@@ -85,9 +85,9 @@ pip install mlx-whisper pynput sounddevice numpy
 
 ---
 
-## Step 1: Create `tak/platforms/macos.py`
+## Step 1: Create `tak/backend/macos.py`
 
-This is the main implementation file. It must export the same interface as `tak/platforms/linux.py` so `tak/__main__.py` can use them interchangeably.
+This is the main implementation file. It must export the same interface as `tak/backend/linux.py` so `tak/__main__.py` can use them interchangeably.
 
 ### Required exports
 
@@ -323,7 +323,7 @@ Add a macOS section after the existing Linux installation instructions. Keep the
 
 Add the macOS backend to the existing diagrams. Changes are additive — do not modify the Linux sections.
 
-1. **Module Structure diagram** — add `tak/platforms/macos.py` as a sibling to `tak/platforms/linux.py`
+1. **Module Structure diagram** — add `tak/backend/macos.py` as a sibling to `tak/backend/linux.py`
 2. **Component Diagram** — add macOS subgraph with Core Audio, mlx-whisper, AppleScript
 3. **Class Diagram** — add `MacAudioRecorder` and `MacTranscriber` extending the base classes
 
@@ -369,10 +369,10 @@ Add the macOS backend to the existing diagrams. Changes are additive — do not 
 - [ ] Spanish characters typed correctly
 - [ ] Works in: TextEdit, VS Code, browser text fields, Terminal
 
-**Cross-platform regression (run on Linux after adding tak/platforms/macos.py):**
+**Cross-platform regression (run on Linux after adding tak/backend/macos.py):**
 
 - [ ] Linux still works (no import errors from macos.py)
-- [ ] `from tak.platforms import macos` only happens when `platform.system() == "Darwin"`
+- [ ] `from tak.backend import macos` only happens when `platform.system() == "Darwin"`
 
 **Performance:**
 
@@ -389,13 +389,13 @@ Add the macOS backend to the existing diagrams. Changes are additive — do not 
 
 3. **Don't add `soundfile` as a dependency.** The `_write_wav()` helper uses only the standard library `wave` module.
 
-4. **Don't modify `tak/app.py`.** The core module is platform-agnostic. All macOS-specific logic goes in `tak/platforms/macos.py`.
+4. **Don't modify `tak/core/app.py`.** The core module is platform-agnostic. All macOS-specific logic goes in `tak/backend/macos.py`.
 
-5. **Don't modify `tak/platforms/linux.py`.** macOS support is purely additive — new files only.
+5. **Don't modify `tak/backend/linux.py`.** macOS support is purely additive — new files only.
 
-6. **Don't put platform-detection logic in `tak/platforms/macos.py`.** That lives in `tak/__main__.py` (the entry point). The macOS module assumes it's running on macOS.
+6. **Don't put platform-detection logic in `tak/backend/macos.py`.** That lives in `tak/__main__.py` (the entry point). The macOS module assumes it's running on macOS.
 
-7. **Don't modify `KEY_MAP` in `tak/app.py`.** The full map lives in core. macOS removes unsupported keys via `adjust_key_map()` in `platform_setup()`.
+7. **Don't modify `KEY_MAP` in `tak/core/app.py`.** The full map lives in core. macOS removes unsupported keys via `adjust_key_map()` in `platform_setup()`.
 
 8. **Don't forget to call `self.normalize()` (not `self._normalize()`).** The normalize method lives on `BaseAudioRecorder` as a public static method.
 

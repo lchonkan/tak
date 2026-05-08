@@ -20,8 +20,8 @@ flowchart TD
     START_CLI([python -m tak]) --> DETECT["platform.system()"]
     START_GUI([TAK.app bundle]) --> GUI["gui_main.py<br/>macOS only"]
 
-    DETECT -->|"Linux"| LINUX_IMPORT["from tak.platforms import linux as backend"]
-    DETECT -->|"Darwin"| MAC_IMPORT["from tak.platforms import macos as backend"]
+    DETECT -->|"Linux"| LINUX_IMPORT["from tak.backend import linux as backend"]
+    DETECT -->|"Darwin"| MAC_IMPORT["from tak.backend import macos as backend"]
 
     LINUX_IMPORT --> LINUX_SETUP["backend.platform_setup()<br/>ensure_cuda_libs()"]
     MAC_IMPORT --> MAC_SETUP["backend.platform_setup()<br/>adjust_key_map()<br/>check_accessibility_permission()"]
@@ -259,7 +259,7 @@ A warm-up transcription runs at startup to trigger the model download and MLX co
 ```mermaid
 sequenceDiagram
     participant EP as tak/__main__.py
-    participant MACOS as platforms/macos.py
+    participant MACOS as backend/macos.py
     participant MLX as mlx_whisper
     participant HF as HuggingFace Hub
     participant METAL as Metal GPU
@@ -294,8 +294,8 @@ The `.app` bundle shows a download splash screen with progress bar during initia
 sequenceDiagram
     participant GUI as gui_main.py
     participant SPLASH as DownloadSplash
-    participant SETTINGS as settings_macos.py
-    participant MACOS as platforms/macos.py
+    participant SETTINGS as ui/macos/settings.py
+    participant MACOS as backend/macos.py
     participant HF as HuggingFace Hub
     participant MLX as mlx_whisper
 

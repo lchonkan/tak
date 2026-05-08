@@ -10,12 +10,13 @@ import objc
 import AppKit
 import Foundation
 
-from tak.config import TakConfig
-from tak.ui.design import (
+from tak.core.config import TakConfig
+from tak.ui.macos.design import (
     rgb, BG_CARD, TEXT, TEXT_DIM, ACCENT, GREEN, PINK,
     RADIUS, CardView, avenir_heavy, avenir_medium, make_label,
 )
-from tak.ui.splash_macos import BarView, is_model_cached, download_model
+from tak.ui.macos.splash import BarView, is_model_cached, download_model
+from tak.core.models import MLX_MODELS
 
 
 # ─── NSUserDefaults keys ────────────────────────────────────────────────
@@ -73,9 +74,9 @@ def save_config(config: TakConfig) -> None:
 # ─── Trigger key options ──────────────────────────────────────────────
 
 _TRIGGER_KEYS = [
-    ("alt_r",   "Right Option (\u2325)"),
-    ("shift_r", "Right Shift (\u21e7)"),
-    ("cmd_r",   "Right Command (\u2318)"),
+    ("alt_r",   "Right Option (⌥)"),
+    ("shift_r", "Right Shift (⇧)"),
+    ("cmd_r",   "Right Command (⌘)"),
 ]
 
 _TRIGGER_KEY_IDS = [k for k, _ in _TRIGGER_KEYS]
@@ -89,14 +90,6 @@ _MODEL_INFO = {
     "medium":   "medium (~1.5 GB)",
     "large-v3": "large-v3 (~3 GB, most accurate)",
     "turbo":    "turbo (~2 GB, fast + accurate)",
-}
-
-# MLX Hub repo IDs (mirrors tak.platforms.macos.MLX_MODELS)
-_MLX_MODELS = {
-    "small":    "mlx-community/whisper-small-mlx",
-    "medium":   "mlx-community/whisper-medium-mlx-fp32",
-    "large-v3": "mlx-community/whisper-large-v3-mlx",
-    "turbo":    "mlx-community/whisper-large-v3-turbo",
 }
 
 _DEPRECATED_MODELS = {"tiny", "base"}
@@ -353,7 +346,7 @@ class SettingsWindow(AppKit.NSObject):
         close_btn.setBordered_(False)
         close_btn.setAttributedTitle_(
             AppKit.NSAttributedString.alloc().initWithString_attributes_(
-                "\u00d7",
+                "×",
                 {
                     AppKit.NSFontAttributeName: avenir_medium(18),
                     AppKit.NSForegroundColorAttributeName: TEXT_DIM,
@@ -469,7 +462,7 @@ class SettingsWindow(AppKit.NSObject):
         self._clipboard_check.setFont_(avenir_medium(13))
         self._clipboard_check.setAttributedTitle_(
             AppKit.NSAttributedString.alloc().initWithString_attributes_(
-                "Use clipboard paste (\u2318V)",
+                "Use clipboard paste (⌘V)",
                 {
                     AppKit.NSFontAttributeName: avenir_medium(13),
                     AppKit.NSForegroundColorAttributeName: TEXT,
@@ -565,7 +558,7 @@ class SettingsWindow(AppKit.NSObject):
         donate.layer().setBackgroundColor_(ACCENT.CGColor())
         donate.setAttributedTitle_(
             AppKit.NSAttributedString.alloc().initWithString_attributes_(
-                "\u2665  Donate",
+                "♥  Donate",
                 {
                     AppKit.NSFontAttributeName: avenir_medium(13),
                     AppKit.NSForegroundColorAttributeName: rgb(13, 17, 23),
@@ -636,9 +629,9 @@ class SettingsWindow(AppKit.NSObject):
         def _do():
             self._dl_bar.setProgress_(progress)
             self._dl_stats.setStringValue_(
-                f"{int(progress * 100)}%  \u00b7  {downloaded} / {total}"
+                f"{int(progress * 100)}%  ·  {downloaded} / {total}"
             )
-            self._dl_speed.setStringValue_(f"{speed}  \u00b7  {eta}")
+            self._dl_speed.setStringValue_(f"{speed}  ·  {eta}")
         self._on_main(_do)
 
     def _start_download(self, model_key: str, model_repo: str):
@@ -735,7 +728,7 @@ class SettingsWindow(AppKit.NSObject):
         save_config(config)
 
         # If the selected model isn't cached locally, download it first
-        model_repo = _MLX_MODELS.get(model_key, model_key)
+        model_repo = MLX_MODELS.get(model_key, model_key)
         if not is_model_cached(model_repo):
             self._start_download(model_key, model_repo)
         else:
@@ -756,3 +749,4 @@ class SettingsWindow(AppKit.NSObject):
             self._build()
         self._panel.makeKeyAndOrderFront_(None)
         AppKit.NSApp.activateIgnoringOtherApps_(True)
+
