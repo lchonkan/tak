@@ -13,7 +13,7 @@ from typing import Optional
 import numpy as np
 import sounddevice as sd
 
-from tak.app import (
+from tak.core.app import (
     BaseAudioRecorder, BaseTranscriber,
     WHISPER_RATE, CHANNELS, DTYPE, BLOCK_SIZE,
     status, announce, warn, error, _resample, C,
@@ -339,10 +339,13 @@ def platform_setup():
     """Run Linux-specific initialization."""
     ensure_cuda_libs()
 
+
 def get_default_model():
     """Default Whisper model for Linux."""
     return "medium"
 
+
 def get_platform_label():
     """Platform label for the banner."""
     return "Linux / X11"
+

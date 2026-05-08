@@ -13,20 +13,12 @@ from typing import Optional
 import numpy as np
 import sounddevice as sd
 
-from tak.app import (
+from tak.core.app import (
     BaseAudioRecorder, BaseTranscriber,
     WHISPER_RATE, CHANNELS, DTYPE, BLOCK_SIZE, KEY_MAP,
     status, announce, warn, error, _resample, C,
 )
-
-
-# ─── MLX Hub model mapping ──────────────────────────────────────────────
-MLX_MODELS = {
-    "small":    "mlx-community/whisper-small-mlx",
-    "medium":   "mlx-community/whisper-medium-mlx-fp32",
-    "large-v3": "mlx-community/whisper-large-v3-mlx",
-    "turbo":    "mlx-community/whisper-large-v3-turbo",
-}
+from tak.core.models import MLX_MODELS
 
 
 # ─── accessibility permission check ─────────────────────────────────────
@@ -296,3 +288,4 @@ def get_default_model():
 def get_platform_label():
     """Platform label for the banner."""
     return "macOS / Metal"
+

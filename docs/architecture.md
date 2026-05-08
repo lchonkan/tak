@@ -25,6 +25,7 @@ Detailed software architecture documentation for TAK (Talk to Keyboard).
 - [Text Injection Flow](#text-injection-flow)
 - [Threading Model](#threading-model)
 - [CUDA Initialization](#cuda-initialization)
+- [Core Logic Overview](#core-logic-overview)
 
 ---
 
@@ -80,17 +81,17 @@ graph TD
         EP_GUI["tak/gui_main.py — GUI<br/>macOS .app bundle<br/>NSUserDefaults config"]
     end
 
-    subgraph "tak/app.py — Shared Core"
+    subgraph "tak/core/app.py — Shared Core"
         TAKAPP[TakApp]
         BASE[BaseAudioRecorder<br/>BaseTranscriber]
         UTIL[parse_args · colors · constants<br/>KEY_MAP · _resample · normalize]
     end
 
-    subgraph "tak/config.py"
+    subgraph "tak/core/config.py"
         CONFIG[TakConfig dataclass]
     end
 
-    subgraph "tak/platforms/linux.py — Linux Backend"
+    subgraph "tak/backend/linux.py — Linux Backend"
         CUDA_INIT[ensure_cuda_libs]
         LINUX_TR[LinuxTranscriber]
         LINUX_REC[LinuxAudioRecorder]
@@ -98,7 +99,7 @@ graph TD
         LINUX_IF[platform_setup · get_default_model<br/>get_platform_label]
     end
 
-    subgraph "tak/platforms/macos.py — macOS Backend"
+    subgraph "tak/backend/macos.py — macOS Backend"
         ACC_CHK[check_accessibility_permission]
         MAC_TR[MacTranscriber]
         MAC_REC[MacAudioRecorder]
@@ -108,10 +109,10 @@ graph TD
 
     subgraph "tak/ui/ — macOS UI Layer"
         DESIGN[design.py<br/>Colors · Fonts · CardView]
-        OVERLAY[overlay_macos.py<br/>Recording pill overlay]
-        MENUBAR[menubar_macos.py<br/>NSStatusItem · dropdown menu]
-        SETTINGS[settings_macos.py<br/>Preferences window<br/>NSUserDefaults persistence]
-        SPLASH[splash_macos.py<br/>Model download splash]
+        OVERLAY[macos/overlay.py<br/>Recording pill overlay]
+        MENUBAR[macos/menubar.py<br/>NSStatusItem · dropdown menu]
+        SETTINGS[macos/settings.py<br/>Preferences window<br/>NSUserDefaults persistence]
+        SPLASH[macos/splash.py<br/>Model download splash]
     end
 
     EP_CLI -->|imports| TAKAPP
@@ -144,7 +145,7 @@ graph TD
 - **No `if IS_MACOS` inside core.** Platform branching happens only in entry points (`tak/__main__.py`, `tak/gui_main.py`).
 - **Two entry points.** `__main__.py` for CLI usage, `gui_main.py` for the macOS `.app` bundle (uses NSUserDefaults instead of CLI args).
 - **Constructor injection.** `TakApp` receives backends as arguments — it never imports a platform module.
-- **Each platform file is self-contained.** Deleting `tak/platforms/linux.py` on a Mac causes no errors.
+- **Each platform file is self-contained.** Deleting `tak/backend/linux.py` on a Mac causes no errors.
 - **Shared utilities in core.** Resampling, normalization, colors, constants, CLI parsing — all platform-agnostic.
 - **Shared design system.** `tak/ui/design.py` provides color tokens, fonts, and reusable views for all macOS UI components.
 
@@ -156,14 +157,14 @@ A detailed view of all components, their responsibilities, and how they intercon
 
 ```mermaid
 graph TD
-    subgraph "tak/app.py — Platform-Agnostic"
+    subgraph "tak/core/app.py — Platform-Agnostic"
         PYNPUT[pynput<br/>Keyboard Listener]
         TAKAPP[TakApp<br/>Main Controller]
         BASE_REC[BaseAudioRecorder<br/>ABC]
         BASE_TR[BaseTranscriber<br/>ABC]
     end
 
-    subgraph "tak/platforms/linux.py — Linux Backend"
+    subgraph "tak/backend/linux.py — Linux Backend"
         subgraph "Linux Input Layer"
             PWREC[pw-record<br/>PipeWire Audio]
             SDEV[sounddevice<br/>ALSA Fallback]
@@ -184,7 +185,7 @@ graph TD
         end
     end
 
-    subgraph "tak/platforms/macos.py — macOS Backend"
+    subgraph "tak/backend/macos.py — macOS Backend"
         subgraph "macOS Input Layer"
             COREAUDIO[sounddevice<br/>Core Audio]
         end
@@ -238,7 +239,7 @@ graph TD
 
 ## Class Diagram
 
-The class hierarchy uses abstract base classes in `tak/app.py` with concrete implementations in platform modules. `TakApp` receives its dependencies via constructor injection.
+The class hierarchy uses abstract base classes in `tak/core/app.py` with concrete implementations in backend modules. `TakApp` receives its dependencies via constructor injection.
 
 ```mermaid
 classDiagram
@@ -327,16 +328,16 @@ classDiagram
 
 | Class / Function | Module |
 |---|---|
-| `TakApp`, `BaseAudioRecorder`, `BaseTranscriber`, `parse_args()` | `tak/app.py` |
-| `TakConfig` | `tak/config.py` |
-| `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/platforms/linux.py` |
-| `MacAudioRecorder`, `MacTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/platforms/macos.py` |
+| `TakApp`, `BaseAudioRecorder`, `BaseTranscriber`, `parse_args()` | `tak/core/app.py` |
+| `TakConfig` | `tak/core/config.py` |
+| `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/backend/linux.py` |
+| `MacAudioRecorder`, `MacTranscriber`, `type_text()`, `type_text_clipboard()` | `tak/backend/macos.py` |
 | CLI platform detection, backend wiring | `tak/__main__.py` |
 | GUI entry point, NSUserDefaults config, download splash | `tak/gui_main.py` |
-| `MacMenuBar` (NSStatusItem, dropdown menu) | `tak/ui/menubar_macos.py` |
-| `SettingsWindow` (preferences panel, NSUserDefaults persistence) | `tak/ui/settings_macos.py` |
-| `MacOverlay` (floating recording pill) | `tak/ui/overlay_macos.py` |
-| `DownloadSplash` (model download progress) | `tak/ui/splash_macos.py` |
+| `MacMenuBar` (NSStatusItem, dropdown menu) | `tak/ui/macos/menubar.py` |
+| `SettingsWindow` (preferences panel, NSUserDefaults persistence) | `tak/ui/macos/settings.py` |
+| `MacOverlay` (floating recording pill) | `tak/ui/macos/overlay.py` |
+| `DownloadSplash` (model download progress) | `tak/ui/macos/splash.py` |
 | Design tokens, `CardView`, `BarView`, font helpers | `tak/ui/design.py` |
 
 ---
@@ -350,10 +351,10 @@ sequenceDiagram
     actor User
     participant KL as Key Listener<br/>(pynput)
     participant App as TakApp<br/>(tak/app)
-    participant Rec as LinuxAudioRecorder<br/>(tak/platforms/linux)
+    participant Rec as LinuxAudioRecorder<br/>(tak/backend/linux)
     participant PW as pw-record / ALSA
     participant Mic as Microphone
-    participant Trans as LinuxTranscriber<br/>(tak/platforms/linux)
+    participant Trans as LinuxTranscriber<br/>(tak/backend/linux)
     participant Whisper as faster-whisper
     participant XDO as xdotool
 
@@ -626,7 +627,7 @@ How TAK pre-loads NVIDIA libraries before the Whisper model is initialized. This
 ```mermaid
 sequenceDiagram
     participant EP as tak/__main__.py
-    participant LINUX as platforms/linux.py
+    participant LINUX as backend/linux.py
     participant CTYPES as ctypes
     participant FS as Filesystem
     participant CUDA as CUDA Libraries
@@ -659,3 +660,96 @@ sequenceDiagram
     WHISPER->>CT2: Initialize engine
     CT2->>CUDA: Find cublas/cudnn (already loaded)
     CT2-->>WHISPER: Model ready
+```
+
+---
+
+## Core Logic Overview
+
+TAK is a **push-to-talk speech-to-text app**. Hold a key → record mic. Release → transcribe locally with Whisper → simulate keystrokes or paste via clipboard into the focused window.
+
+`TakApp` (`tak/core/app.py`) is the platform-agnostic orchestrator. It owns a trigger key, a `BaseAudioRecorder`, a `BaseTranscriber`, two output functions (`type_fn`, `clipboard_fn`), optional UI callbacks (`on_recording` / `on_transcribing` / `on_idle`), and an optional accessibility check. Everything platform-specific is **injected** — `core/app.py` has zero `import platform`.
+
+### Lifecycle of one utterance
+
+1. `pynput.keyboard.Listener` fires `_on_press` (`app.py:168`). If the key matches and we're not mid-transcription, it calls `recorder.start()` and `on_recording()` (overlay pill turns red).
+2. On `_on_release` (`app.py:180`), it calls `recorder.stop()` to get an int16 PCM array. Clips shorter than 0.3 s are discarded.
+3. It fires `on_transcribing()` (pill turns yellow) and spawns a **daemon thread** running `_process` so the key listener stays responsive (`app.py:193`).
+4. `_process` (`app.py:195`) calls `transcriber.transcribe(audio)`, then either `clipboard_fn(text)` or `type_fn(text)`, then `on_idle()`.
+5. A `threading.Lock` plus the `_processing` flag prevents a second clip from starting until the current one finishes.
+
+### Platform backends
+
+| Concern     | Linux (`backend/linux.py`)  | macOS (`backend/macos.py`)            |
+|-------------|-------------------------------|-----------------------------------------|
+| Audio       | sounddevice / PipeWire / ALSA | sounddevice / Core Audio                |
+| Model       | faster-whisper (CUDA / CPU)   | mlx-whisper (Metal)                     |
+| Typing      | pynput keystrokes             | AppleScript (osascript) — clipboard only|
+| Permissions | —                             | `AXIsProcessTrusted` poll + listener restart |
+
+### Two entry points
+
+- **CLI** (`tak/__main__.py`): platform detection → builds backend → `TakApp.run()` → listener blocks main thread.
+- **GUI .app** (`tak/gui_main.py`): loads `TakConfig` from `NSUserDefaults` → wires menubar + overlay + splash → `TakApp.run(main_loop=NSApp.run)` so AppKit owns the main thread and pynput runs in a daemon thread.
+
+### Architecture diagram
+
+```text
+                    ┌──────────────────────────────────────────────┐
+                    │            ENTRY POINTS                      │
+                    │                                              │
+                    │  __main__.py (CLI)        gui_main.py (.app) │
+                    │  ─ argparse               ─ NSUserDefaults   │
+                    │  ─ platform detect        ─ splash/menubar   │
+                    │  ─ build backends         ─ build backends   │
+                    └────────────────┬─────────────────────────────┘
+                                     │ injects backends + UI callbacks
+                                     ▼
+        ┌──────────────────────────────────────────────────────────┐
+        │                   tak/core/app.py                         │
+        │                       TakApp                             │
+        │                                                          │
+        │   pynput.Listener ──► _on_press  ──► recorder.start()    │
+        │                       _on_release ─► recorder.stop()     │
+        │                                      │                   │
+        │                                      ▼                   │
+        │                      threading.Thread(_process)          │
+        │                       │                                  │
+        │       ┌───────────────┼───────────────────┐              │
+        │       ▼               ▼                   ▼              │
+        │  transcriber     type_fn /          on_recording /       │
+        │  .transcribe()   clipboard_fn       on_transcribing /    │
+        │                                     on_idle (UI hooks)   │
+        └─────┬──────────────────┬──────────────────┬──────────────┘
+              │                  │                  │
+   ┌──────────┴──────┐  ┌────────┴────────┐  ┌──────┴────────────┐
+   │  Recorder       │  │  Transcriber    │  │  UI (macOS only)  │
+   │  (Base)         │  │  (Base)         │  │                   │
+   │                 │  │                 │  │  ui/macos/overlay │
+   │  Linux: sounded │  │  Linux: faster- │  │   (red/yellow     │
+   │  device → int16 │  │   whisper CUDA  │  │    pill)          │
+   │                 │  │                 │  │  ui/macos/menubar │
+   │  macOS: sounded │  │  macOS: mlx-    │  │  ui/settings_…    │
+   │  device → int16 │  │   whisper Metal │  │  ui/splash_…      │
+   └─────────────────┘  └─────────────────┘  └───────────────────┘
+              │                  │                  │
+              ▼                  ▼                  ▼
+        Core Audio /         Whisper model     AppKit (NSStatus
+        ALSA mic             weights (~/.cache  Item, NSPanel,
+                             /huggingface)      NSWindow)
+                                     │
+                                     ▼
+                         ┌───────────────────────┐
+                         │   Output to OS        │
+                         │  Linux: pynput keys   │
+                         │  macOS: AppleScript   │
+                         │   clipboard paste     │
+                         └───────────────────────┘
+```
+
+### Key invariants
+
+- **Constructor injection** — `TakApp` never imports a platform module.
+- **Heavy deps loaded lazily** — `mlx_whisper` / `faster_whisper` imported inside `__init__`, not at module top.
+- **Threading model** — pynput callbacks run on the listener thread; transcription runs on a fresh daemon thread; UI callbacks must be marshaled to the main thread by the platform layer (e.g. `performSelectorOnMainThread`).
+- **Single lock** guards `_processing`, blocking new captures until the current transcription finishes.

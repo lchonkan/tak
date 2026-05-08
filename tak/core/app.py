@@ -35,6 +35,7 @@ class C:
     BLUE   = "\033[94m"
     MAG    = "\033[95m"
 
+
 def banner(platform_label: str = ""):
     print(f"""
 {C.CYAN}{C.BOLD}╔══════════════════════════════════════════╗
@@ -43,14 +44,18 @@ def banner(platform_label: str = ""):
 ╚══════════════════════════════════════════╝{C.RESET}
 """)
 
+
 def status(msg: str, color: str = C.DIM):
     print(f"  {color}▸ {msg}{C.RESET}")
+
 
 def announce(msg: str):
     print(f"\n  {C.GREEN}{C.BOLD}✔ {msg}{C.RESET}")
 
+
 def warn(msg: str):
     print(f"  {C.YELLOW}⚠ {msg}{C.RESET}")
+
 
 def error(msg: str):
     print(f"  {C.RED}✖ {msg}{C.RESET}")
@@ -96,6 +101,7 @@ def _build_key_map() -> dict:
         except AttributeError:
             pass  # key doesn't exist on this platform
     return kmap
+
 
 KEY_MAP = _build_key_map()
 
@@ -299,3 +305,4 @@ Available keys:
     parser.add_argument("--device", "-d", type=int, default=None,
                         help="Audio input device index (see: python -m sounddevice)")
     return parser.parse_args()
+

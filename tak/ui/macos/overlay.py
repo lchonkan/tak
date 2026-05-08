@@ -113,7 +113,6 @@ class MacOverlay(BaseOverlay):
         Must be called on the main thread.
         """
         screens = AppKit.NSScreen.screens()
-        current_count = len(self._panels)
         needed = len(screens)
 
         # Add panels for new screens
@@ -183,3 +182,4 @@ def stop_app_loop():
         0, 0, 0, None, 0, 0, 0,
     )
     AppKit.NSApp.postEvent_atStart_(event, True)
+

@@ -18,7 +18,7 @@ import sys
 
 
 def main():
-    from tak.app import parse_args, KEY_MAP, error, warn
+    from tak.core.app import parse_args, KEY_MAP, error, warn
 
     args = parse_args()
 
@@ -27,9 +27,9 @@ def main():
 
     # ── Import platform backend ──────────────────────────────────
     if IS_MACOS:
-        from tak.platforms import macos as backend
+        from tak.backend import macos as backend
     elif IS_LINUX:
-        from tak.platforms import linux as backend
+        from tak.backend import linux as backend
     else:
         error(f"Unsupported platform: {platform.system()}")
         sys.exit(1)
@@ -65,8 +65,8 @@ def main():
     main_loop = None
 
     if IS_MACOS:
-        from tak.ui.overlay_macos import MacOverlay, run_app_loop, stop_app_loop
-        from tak.ui.menubar_macos import MacMenuBar
+        from tak.ui.macos.overlay import MacOverlay, run_app_loop, stop_app_loop
+        from tak.ui.macos.menubar import MacMenuBar
         overlay = MacOverlay()
         menubar = MacMenuBar.alloc().init()
         main_loop = run_app_loop
@@ -79,7 +79,7 @@ def main():
         return _call
 
     # ── Build and run app ────────────────────────────────────────
-    from tak.app import TakApp
+    from tak.core.app import TakApp
 
     on_recording = None
     on_transcribing = None
