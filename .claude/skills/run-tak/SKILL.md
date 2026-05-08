@@ -9,9 +9,9 @@ Use this skill when the user asks to run, launch, start, or test the TAK macOS a
 
 ## Procedure
 
-1. **Build if missing.** If `dist/TAK.app` does not exist, build it first:
+1. **Build if missing.** If `dist/TAK.app` does not exist, build it first. Always run from the project root so `dist/` lands in the right place:
    ```bash
-   source /opt/anaconda3/etc/profile.d/conda.sh && conda activate tak && python setup_app.py
+   source /opt/anaconda3/etc/profile.d/conda.sh && conda activate tak && python app/setup_app.py
    ```
    Use a long timeout (~10 min). If the build fails, stop and report the error — do not attempt to launch.
 
@@ -34,4 +34,5 @@ Use this skill when the user asks to run, launch, start, or test the TAK macOS a
 
 - The log path is `~/Library/Logs/TAK/tak.log`. The `.app` bundle redirects stdout/stderr there.
 - Accessibility-permission warnings are expected after a fresh install or uninstall — they are not crashes. The app continues running and polls for the permission.
-- Common crash causes (check `TAK.spec` if these reappear): missing hidden imports under `mlx.*`, missing `mlx_whisper/assets/` data files.
+- Common crash causes (check `app/TAK.spec` if these reappear): missing hidden imports under `mlx.*`, missing `mlx_whisper/assets/` data files.
+- Build/spec layout: source lives under `app/` (`app/setup_app.py`, `app/TAK.spec`, `app/tak/`), but `resources/` and `dist/` are at the project root. Build commands must run from the project root.

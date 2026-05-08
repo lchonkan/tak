@@ -6,8 +6,10 @@ Use this skill when the user asks to completely uninstall TAK, remove TAK, or cl
 
 Run the provided bash script to completely uninstall TAK and all associated data from the system:
 
+Run from the project root:
+
 ```bash
-./uninstall.sh
+./app/uninstall.sh
 ```
 
 This script mirrors the macOS native uninstaller logic found in the app. It will:
