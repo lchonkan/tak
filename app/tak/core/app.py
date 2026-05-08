@@ -1,144 +1,19 @@
-"""
-TAK Core — Platform-agnostic shared code.
-
-Contains TakApp, CLI parser, color helpers, constants, base classes,
-resampling, and key mapping. No platform-specific imports.
-"""
+"""Main push-to-talk application controller."""
 
 from __future__ import annotations
 
-import argparse
 import threading
-import time
-from abc import ABC, abstractmethod
 from typing import Optional, Callable
 
 import numpy as np
 from pynput import keyboard
 
-# ─── constants ──────────────────────────────────────────────────────────
-WHISPER_RATE = 16000  # Whisper expects 16 kHz
-CHANNELS = 1
-DTYPE = "int16"
-BLOCK_SIZE = 1024  # frames per audio callback
+from tak.core.audio import BaseAudioRecorder, BaseTranscriber
+from tak.core.console import C, announce, banner, error, status, warn
+from tak.core.constants import WHISPER_RATE
+from tak.core.keymap import KEY_MAP
 
 
-# ─── color helpers ──────────────────────────────────────────────────────
-class C:
-    RESET  = "\033[0m"
-    BOLD   = "\033[1m"
-    DIM    = "\033[2m"
-    RED    = "\033[91m"
-    GREEN  = "\033[92m"
-    YELLOW = "\033[93m"
-    CYAN   = "\033[96m"
-    BLUE   = "\033[94m"
-    MAG    = "\033[95m"
-
-
-def banner(platform_label: str = ""):
-    print(f"""
-{C.CYAN}{C.BOLD}╔══════════════════════════════════════════╗
-║            TAK · Talk to Keyboard        ║
-║  {platform_label:^40s}║
-╚══════════════════════════════════════════╝{C.RESET}
-""")
-
-
-def status(msg: str, color: str = C.DIM):
-    print(f"  {color}▸ {msg}{C.RESET}")
-
-
-def announce(msg: str):
-    print(f"\n  {C.GREEN}{C.BOLD}✔ {msg}{C.RESET}")
-
-
-def warn(msg: str):
-    print(f"  {C.YELLOW}⚠ {msg}{C.RESET}")
-
-
-def error(msg: str):
-    print(f"  {C.RED}✖ {msg}{C.RESET}")
-
-
-# ─── resampling ──────────────────────────────────────────────────────────
-def _resample(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
-    """Resample audio from orig_sr to target_sr using linear interpolation.
-
-    Good enough for speech — avoids pulling in scipy/librosa.
-    """
-    if orig_sr == target_sr:
-        return audio
-    duration = len(audio) / orig_sr
-    target_len = int(duration * target_sr)
-    indices = np.linspace(0, len(audio) - 1, target_len)
-    return np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
-
-
-# ─── key name mapping ───────────────────────────────────────────────────
-def _build_key_map() -> dict:
-    """Build key map, skipping keys that don't exist on the current platform."""
-    _entries = [
-        ("ctrl_r",      "ctrl_r"),
-        ("ctrl_l",      "ctrl_l"),
-        ("alt_r",       "alt_r"),
-        ("alt_l",       "alt_l"),
-        ("shift_r",     "shift_r"),
-        ("shift_l",     "shift_l"),
-        ("cmd_r",       "cmd_r"),
-        ("scroll_lock", "scroll_lock"),
-        ("pause",       "pause"),
-        ("insert",      "insert"),
-        ("f1",  "f1"),  ("f2",  "f2"),  ("f3",  "f3"),  ("f4",  "f4"),
-        ("f5",  "f5"),  ("f6",  "f6"),  ("f7",  "f7"),  ("f8",  "f8"),
-        ("f9",  "f9"),  ("f10", "f10"), ("f11", "f11"), ("f12", "f12"),
-        ("caps_lock",   "caps_lock"),
-    ]
-    kmap = {}
-    for name, attr in _entries:
-        try:
-            kmap[name] = getattr(keyboard.Key, attr)
-        except AttributeError:
-            pass  # key doesn't exist on this platform
-    return kmap
-
-
-KEY_MAP = _build_key_map()
-
-
-# ─── base classes ────────────────────────────────────────────────────────
-class BaseAudioRecorder(ABC):
-    """Interface for platform-specific audio recorders."""
-
-    @abstractmethod
-    def start(self) -> None:
-        ...
-
-    @abstractmethod
-    def stop(self) -> Optional[np.ndarray]:
-        ...
-
-    @staticmethod
-    def normalize(audio: np.ndarray) -> np.ndarray:
-        """Auto-normalize quiet audio so Whisper can hear it."""
-        peak = np.max(np.abs(audio))
-        if peak > 1e-6:
-            gain = min(0.9 / peak, 200.0)
-            if gain > 1.5:
-                status(f"Mic level low (peak {peak:.4f}), boosting {gain:.0f}×", C.YELLOW)
-            audio = audio * gain
-        return audio
-
-
-class BaseTranscriber(ABC):
-    """Interface for platform-specific transcribers."""
-
-    @abstractmethod
-    def transcribe(self, audio: np.ndarray) -> str:
-        ...
-
-
-# ─── main application ──────────────────────────────────────────────────
 class TakApp:
     """Main push-to-talk application."""
 
@@ -271,38 +146,3 @@ class TakApp:
             print(f"\n  {C.DIM}Bye! 👋{C.RESET}\n")
         finally:
             self._listener.stop()
-
-
-# ─── CLI ────────────────────────────────────────────────────────────────
-def parse_args():
-    parser = argparse.ArgumentParser(
-        prog="tak",
-        description="TAK — Talk to Keyboard. Push-to-talk speech-to-text.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python -m tak                          # Hold default key to talk
-  python -m tak --key scroll_lock        # Use Scroll Lock instead
-  python -m tak --key caps_lock          # Use Caps Lock
-  python -m tak --model large-v3         # More accurate (slower)
-  python -m tak --model turbo            # Fast + accurate (macOS default)
-  python -m tak --clipboard              # Use clipboard paste
-  python -m tak --cpu                    # Run on CPU (no GPU needed)
-
-Available keys:
-  alt_r (macOS default), ctrl_r (Linux default), ctrl_l, alt_l,
-  shift_r, shift_l, scroll_lock, pause, insert, f1-f12, caps_lock
-        """,
-    )
-    parser.add_argument("--key", "-k", default="ctrl_r",
-                        help="Key to hold for push-to-talk (default: alt_r on macOS, ctrl_r on Linux)")
-    parser.add_argument("--model", "-m", default=None,
-                        help="Whisper model size (default: turbo on macOS, medium on Linux)")
-    parser.add_argument("--clipboard", "-c", action="store_true",
-                        help="Use clipboard paste instead of simulated typing (always on for macOS)")
-    parser.add_argument("--cpu", action="store_true",
-                        help="Force CPU inference (default: uses CUDA if available)")
-    parser.add_argument("--device", "-d", type=int, default=None,
-                        help="Audio input device index (see: python -m sounddevice)")
-    return parser.parse_args()
-

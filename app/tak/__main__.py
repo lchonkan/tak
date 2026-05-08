@@ -18,7 +18,9 @@ import sys
 
 
 def main():
-    from tak.core.app import parse_args, KEY_MAP, error, warn
+    from tak.core.cli import parse_args
+    from tak.core.console import error, warn
+    from tak.core.keymap import KEY_MAP
 
     args = parse_args()
 

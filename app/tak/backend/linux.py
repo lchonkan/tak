@@ -13,11 +13,9 @@ from typing import Optional
 import numpy as np
 import sounddevice as sd
 
-from tak.core.app import (
-    BaseAudioRecorder, BaseTranscriber,
-    WHISPER_RATE, CHANNELS, DTYPE, BLOCK_SIZE,
-    status, announce, warn, error, _resample, C,
-)
+from tak.core.audio import BaseAudioRecorder, BaseTranscriber, _resample
+from tak.core.console import C, announce, error, status, warn
+from tak.core.constants import BLOCK_SIZE, CHANNELS, DTYPE, WHISPER_RATE
 
 
 # ─── CUDA initialization ────────────────────────────────────────────────

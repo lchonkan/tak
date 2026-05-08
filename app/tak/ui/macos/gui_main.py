@@ -53,7 +53,8 @@ def main():
     from tak.ui.macos.overlay import MacOverlay, run_app_loop
     from tak.ui.macos.menubar import MacMenuBar
     from tak.ui.macos.settings import load_config
-    from tak.core.app import TakApp, KEY_MAP
+    from tak.core.app import TakApp
+    from tak.core.keymap import KEY_MAP
     logging.info("Imports done")
 
     # Load config from NSUserDefaults
