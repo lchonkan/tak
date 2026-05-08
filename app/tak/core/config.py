@@ -14,3 +14,4 @@ class TakConfig:
     model: str = "turbo"
     use_clipboard: bool = True
     audio_device: Optional[int] = None
+

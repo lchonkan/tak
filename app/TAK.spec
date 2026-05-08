@@ -8,25 +8,39 @@ _sp = os.path.join(os.path.dirname(sys.executable), '..', 'lib',
 _sp = os.path.normpath(_sp)
 _mlx_lib = os.path.join(_sp, 'mlx', 'lib')
 _sd_data = os.path.join(_sp, '_sounddevice_data')
+_mlx_whisper_assets = os.path.join(_sp, 'mlx_whisper', 'assets')
 
 datas = [
     (os.path.join(_mlx_lib, 'mlx.metallib'), 'mlx/lib'),
+    (_mlx_whisper_assets, 'mlx_whisper/assets'),
 ]
 if os.path.isdir(_sd_data):
     datas.append((_sd_data, '_sounddevice_data'))
 
 binaries = [(os.path.join(_mlx_lib, 'libmlx.dylib'), 'mlx/lib')]
-hiddenimports = ['AppKit', 'Foundation', 'objc', 'sounddevice', 'numpy']
-tmp_ret = collect_all('mlx')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('mlx_whisper')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+hiddenimports = [
+    'AppKit', 'Foundation', 'objc',
+    'sounddevice', 'numpy',
+    # MLX: avoid importing all submodules during build isolation because
+    # `mlx.optimizers` can crash in headless/isolated contexts on some systems.
+    # We include the core modules explicitly instead.
+    'mlx',
+    'mlx.core',
+    'mlx.nn',
+    'mlx.utils',
+    'mlx._reprlib_fix',
+    # mlx-whisper is imported dynamically (local import in MacTranscriber).
+    # Avoid collect_all() here for the same reason as mlx.
+    'mlx_whisper',
+    # huggingface_hub is imported inside the splash download helpers.
+    'huggingface_hub',
+]
 tmp_ret = collect_all('pynput')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['tak/gui_main.py'],
+    ['tak/ui/macos/gui_main.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,

@@ -164,7 +164,7 @@ class MacMenuBar(AppKit.NSObject):
 
         # Preferences
         prefs_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            "Preferences\u2026", "openSettings:", ","
+            "Preferences…", "openSettings:", ","
         )
         prefs_item.setTarget_(self)
         menu.addItem_(prefs_item)
@@ -173,7 +173,7 @@ class MacMenuBar(AppKit.NSObject):
 
         # Uninstall
         uninstall_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            "Uninstall TAK\u2026", "uninstallApp:", ""
+            "Uninstall TAK…", "uninstallApp:", ""
         )
         uninstall_item.setTarget_(self)
         menu.addItem_(uninstall_item)
@@ -201,7 +201,7 @@ class MacMenuBar(AppKit.NSObject):
             if not hasattr(self, "_accessibility_item"):
                 menu = self._status_item.menu()
                 self._accessibility_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-                    "Grant Accessibility\u2026", "openAccessibility:", ""
+                    "Grant Accessibility…", "openAccessibility:", ""
                 )
                 self._accessibility_item.setTarget_(self)
                 menu.insertItem_atIndex_(self._accessibility_item, 1)
@@ -236,7 +236,7 @@ class MacMenuBar(AppKit.NSObject):
     @objc.typedSelector(b"v@:@")
     def openSettings_(self, sender):
         if self._settings_window is None:
-            from tak.ui.settings_macos import SettingsWindow
+            from tak.ui.macos.settings import SettingsWindow
             self._settings_window = SettingsWindow.alloc().init()
         self._settings_window.show()
 
@@ -246,11 +246,11 @@ class MacMenuBar(AppKit.NSObject):
         alert.setMessageText_("Uninstall TAK?")
         alert.setInformativeText_(
             "This will remove:\n"
-            "\u2022 TAK.app\n"
-            "\u2022 Saved preferences\n"
-            "\u2022 Log files\n"
-            "\u2022 Downloaded Whisper models\n"
-            "\u2022 Microphone & Accessibility permissions\n\n"
+            "• TAK.app\n"
+            "• Saved preferences\n"
+            "• Log files\n"
+            "• Downloaded Whisper models\n"
+            "• Microphone & Accessibility permissions\n\n"
             "This cannot be undone."
         )
         alert.setAlertStyle_(AppKit.NSAlertStyleCritical)
@@ -305,7 +305,7 @@ class MacMenuBar(AppKit.NSObject):
 
     @objc.typedSelector(b"v@:@")
     def quitApp_(self, sender):
-        from tak.ui.overlay_macos import stop_app_loop
+        from tak.ui.macos.overlay import stop_app_loop
         stop_app_loop()
 
     # ── State updates (thread-safe) ─────────────────────────────────
@@ -321,10 +321,11 @@ class MacMenuBar(AppKit.NSObject):
             AppKit.NSOperationQueue.mainQueue().addOperationWithBlock_(_inner)
 
     def set_recording(self) -> None:
-        self._update_on_main(self._icon_recording, "Recording\u2026")
+        self._update_on_main(self._icon_recording, "Recording…")
 
     def set_transcribing(self) -> None:
-        self._update_on_main(self._icon_transcribing, "Transcribing\u2026")
+        self._update_on_main(self._icon_transcribing, "Transcribing…")
 
     def set_idle(self) -> None:
         self._update_on_main(self._icon_idle, "Idle")
+

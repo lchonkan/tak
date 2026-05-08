@@ -48,20 +48,25 @@ TAK is a modular push-to-talk speech-to-text app. The architecture uses dependen
 tak/                            # Python package
 ├── __init__.py                 # Package marker + __version__
 ├── __main__.py                 # CLI entry point (platform detection, backend wiring)
-├── gui_main.py                 # GUI entry point for macOS .app bundle
-├── app.py                      # Shared core (TakApp, base classes, CLI, constants)
-├── config.py                   # TakConfig dataclass (platform-agnostic settings)
-├── platforms/
+├── core/
+│   ├── __init__.py
+│   ├── app.py                  # Shared core (TakApp, base classes, CLI, constants)
+│   ├── config.py               # TakConfig dataclass (platform-agnostic settings)
+│   └── models.py               # Shared model metadata (MLX repo IDs)
+├── backend/
 │   ├── __init__.py
 │   ├── linux.py                # Linux backend
 │   └── macos.py                # macOS backend (mlx-whisper, Core Audio, AppleScript)
 └── ui/
     ├── __init__.py
-    ├── design.py               # Shared design system (colors, fonts, card views)
-    ├── overlay_macos.py        # Floating recording/transcribing pill overlay
-    ├── menubar_macos.py        # macOS menu bar status item and dropdown
-    ├── settings_macos.py       # Preferences window (NSUserDefaults persistence)
-    └── splash_macos.py         # Model download splash screen
+    └── macos/
+        ├── __init__.py
+        ├── design.py           # macOS design system (colors, fonts, card views)
+        ├── gui_main.py         # GUI entry point for macOS .app bundle
+        ├── overlay.py          # Floating recording/transcribing pill overlay
+        ├── menubar.py          # macOS menu bar status item and dropdown
+        ├── settings.py         # Preferences window (NSUserDefaults persistence)
+        └── splash.py           # Model download splash screen
 ```
 
 ### File responsibilities
@@ -69,16 +74,17 @@ tak/                            # Python package
 | File | Role | Rules |
 |------|------|-------|
 | `tak/__main__.py` | CLI entry point | Platform detection, CLI argument parsing, backend wiring into `TakApp`. Used by `run.sh` and `python -m tak`. |
-| `tak/gui_main.py` | GUI entry point | macOS `.app` bundle launcher. Loads config from NSUserDefaults (not CLI args), shows download splash, builds menu bar and overlay. Used by PyInstaller (`TAK.spec`). |
-| `tak/app.py` | Shared core | **Zero platform-specific imports.** No `import platform`, no `if IS_MACOS`. Contains `TakApp`, base classes (`BaseAudioRecorder`, `BaseTranscriber`), `parse_args()`, constants, color helpers, `_resample()`, `KEY_MAP`. |
-| `tak/config.py` | Settings container | `TakConfig` dataclass with `trigger_key`, `model`, `use_clipboard`, `audio_device`. Platform-agnostic — no UI or persistence logic. |
-| `tak/platforms/linux.py` | Linux backend | `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()`, `ensure_cuda_libs()`, `platform_setup()`, `get_default_model()`, `get_platform_label()`. Imports from `tak.app` only. |
-| `tak/platforms/macos.py` | macOS backend | `MacAudioRecorder`, `MacTranscriber`, `type_text()`, `type_text_clipboard()`, `check_accessibility_permission()`, `adjust_key_map()`, `_write_wav()`, `platform_setup()`, `get_default_model()`, `get_platform_label()`. Uses mlx-whisper (Metal), Core Audio (sounddevice), AppleScript (osascript). Imports from `tak.app` only. |
-| `tak/ui/design.py` | Design system | Shared colors, fonts, and reusable views (`CardView`, `BarView`). All UI files import from here. |
-| `tak/ui/overlay_macos.py` | Recording overlay | Floating pill on all screens — red while recording, yellow while transcribing. |
-| `tak/ui/menubar_macos.py` | Menu bar | `NSStatusItem` with mic icon, status display, Preferences / Uninstall / Quit menu items. |
-| `tak/ui/settings_macos.py` | Preferences window | Borderless panel for trigger key, model, audio device, clipboard toggle. Persists to `NSUserDefaults`. Shows inline model download progress. Shows restart-required modal after changes. |
-| `tak/ui/splash_macos.py` | Download splash | Full-screen overlay shown during initial model download with progress bar, speed, and ETA. |
+| `tak/ui/macos/gui_main.py` | GUI entry point | macOS `.app` bundle launcher. Loads config from NSUserDefaults (not CLI args), shows download splash, builds menu bar and overlay. Used by PyInstaller (`TAK.spec`). |
+| `tak/core/app.py` | Shared core | **Zero platform-specific imports.** No `import platform`, no `if IS_MACOS`. Contains `TakApp`, base classes (`BaseAudioRecorder`, `BaseTranscriber`), `parse_args()`, constants, color helpers, `_resample()`, `KEY_MAP`. |
+| `tak/core/config.py` | Settings container | `TakConfig` dataclass with `trigger_key`, `model`, `use_clipboard`, `audio_device`. Platform-agnostic — no UI or persistence logic. |
+| `tak/core/models.py` | Model metadata | Shared model maps (e.g. MLX Whisper repo IDs) used by UI and backends. |
+| `tak/backend/linux.py` | Linux backend | `LinuxAudioRecorder`, `LinuxTranscriber`, `type_text()`, `type_text_clipboard()`, `ensure_cuda_libs()`, `platform_setup()`, `get_default_model()`, `get_platform_label()`. Imports from `tak.core.app`. |
+| `tak/backend/macos.py` | macOS backend | `MacAudioRecorder`, `MacTranscriber`, `type_text()`, `type_text_clipboard()`, `check_accessibility_permission()`, `adjust_key_map()`, `_write_wav()`, `platform_setup()`, `get_default_model()`, `get_platform_label()`. Uses mlx-whisper (Metal), Core Audio (sounddevice), AppleScript (osascript). Imports from `tak.core.app` and `tak.core.models`. |
+| `tak/ui/macos/design.py` | Design system | macOS colors, fonts, and reusable views (`CardView`, `BarView`). All macOS UI files import from here. |
+| `tak/ui/macos/overlay.py` | Recording overlay | Floating pill on all screens — red while recording, yellow while transcribing. |
+| `tak/ui/macos/menubar.py` | Menu bar | `NSStatusItem` with mic icon, status display, Preferences / Uninstall / Quit menu items. |
+| `tak/ui/macos/settings.py` | Preferences window | Borderless panel for trigger key, model, audio device, clipboard toggle. Persists to `NSUserDefaults`. Shows inline model download progress. Shows restart-required modal after changes. |
+| `tak/ui/macos/splash.py` | Download splash | Full-screen overlay shown during initial model download with progress bar, speed, and ETA. |
 | `run.sh` | Launcher | Activates conda env, sets CUDA paths on Linux only, runs `python -m tak`. |
 | `TAK.spec` | PyInstaller spec | Builds macOS `.app` bundle via `pyinstaller TAK.spec`. Contains BUNDLE step that creates `TAK.app`. All build config (datas, binaries, hidden imports, excludes) lives here — `setup_app.py` just invokes it. |
 | `setup_app.py` | App bundle build | Runs `pyinstaller TAK.spec`, then patches Info.plist and ad-hoc code signs the bundle. This is the single command to build: `python setup_app.py`. |
@@ -91,14 +97,14 @@ tak/                            # Python package
 - **Platform modules are self-contained.** Deleting `linux.py` on a Mac or `macos.py` on Linux must not cause errors.
 - **Local imports for heavy deps.** `faster_whisper` and `mlx_whisper` are imported inside `__init__()`, not at module level.
 - **Shared utilities stay in core.** Resampling, normalization, colors, constants, CLI parsing.
-- **All imports are absolute.** Use `from tak.app import ...` and `from tak.platforms import linux`, not relative imports.
+- **All imports are absolute.** Use `from tak.core.app import ...` and `from tak.backend import linux`, not relative imports.
 
 ### Adding a new platform
 
-1. Create `tak/platforms/<platform>.py` implementing the same interface (see `tak/platforms/linux.py` as reference)
+1. Create `tak/backend/<platform>.py` implementing the same interface (see `tak/backend/linux.py` as reference)
 2. Add the platform branch in `tak/__main__.py`
 3. Create `requirements-<platform>.txt`
-4. Do not modify `tak/app.py` or existing platform files
+4. Do not modify `tak/core/app.py` or existing platform files
 
 ## App Bundle Build
 
@@ -117,7 +123,7 @@ This runs `pyinstaller TAK.spec`, patches Info.plist, and ad-hoc code signs the 
 - **Never bypass `TAK.spec`** by passing CLI flags to PyInstaller directly. The spec file contains the BUNDLE step that creates the `.app` wrapper. Without it, PyInstaller only produces a bare `dist/TAK/` directory.
 - **Paths in `TAK.spec` must be dynamic** — resolved from the active Python environment at build time, never hardcoded to a specific conda path.
 - **After building, always verify** that `dist/TAK.app/Contents/` exists (not just `dist/TAK/`).
-- **After any change to `gui_main.py` or build files**, rebuild and launch the `.app` to verify it works. Check `~/Library/Logs/TAK/tak.log` for errors.
+- **After any change to `tak/ui/macos/gui_main.py` or build files**, rebuild and launch the `.app` to verify it works. Check `~/Library/Logs/TAK/tak.log` for errors.
 
 ### macOS permissions model
 

@@ -10,7 +10,7 @@ import AppKit
 import Foundation
 import objc
 
-from tak.ui.design import (
+from tak.ui.macos.design import (
     BORDER, TEXT, TEXT_DIM, ACCENT,
     CardView, make_label,
 )
@@ -21,7 +21,6 @@ _PAD = 32
 
 
 # ─── Custom views ─────────────────────────────────────────────────────
-
 class BarView(AppKit.NSView):
     """Rounded progress bar with track and configurable fill color."""
 
@@ -56,7 +55,6 @@ class BarView(AppKit.NSView):
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────
-
 def _fmt_bytes(n):
     for u in ("B", "KB", "MB", "GB"):
         if n < 1024:
@@ -73,7 +71,6 @@ def _fmt_eta(s):
 
 
 # ─── Splash window ────────────────────────────────────────────────────
-
 class DownloadSplash:
     """Floating model-download / model-loading progress window."""
 
@@ -111,7 +108,7 @@ class DownloadSplash:
         cy -= 6
 
         cy -= 18
-        self._status = make_label("Preparing\u2026", 13, color=TEXT_DIM)
+        self._status = make_label("Preparing…", 13, color=TEXT_DIM)
         self._status.setFrame_(Foundation.NSMakeRect(_PAD, cy, cw, 18))
         card.addSubview_(self._status)
         cy -= 2
@@ -158,7 +155,7 @@ class DownloadSplash:
 
     def show_loading(self, model_name: str):
         def _do():
-            self._status.setStringValue_("Loading model\u2026")
+            self._status.setStringValue_("Loading model…")
             self._model.setStringValue_(model_name)
             self._bar.setProgress_(1.0)
             self._stats.setStringValue_("")
@@ -170,9 +167,9 @@ class DownloadSplash:
         def _do():
             self._bar.setProgress_(progress)
             self._stats.setStringValue_(
-                f"{int(progress * 100)}%  \u00b7  {downloaded} / {total}"
+                f"{int(progress * 100)}%  ·  {downloaded} / {total}"
             )
-            self._speed.setStringValue_(f"{speed}  \u00b7  {eta}")
+            self._speed.setStringValue_(f"{speed}  ·  {eta}")
         self._on_main(_do)
 
     def hide(self):
@@ -180,7 +177,6 @@ class DownloadSplash:
 
 
 # ─── tqdm-compatible progress reporter ────────────────────────────────
-
 class _DownloadProgress:
     """Minimal tqdm replacement that reports download progress to DownloadSplash.
 
@@ -290,7 +286,6 @@ class _DownloadProgress:
 
 
 # ─── Public helpers ────────────────────────────────────────────────────
-
 def is_model_cached(repo_id: str) -> bool:
     """Check whether a HuggingFace model is already in the local cache."""
     if os.path.isdir(repo_id):
@@ -313,3 +308,4 @@ def download_model(repo_id: str, splash: DownloadSplash) -> str:
         return snapshot_download(repo_id, tqdm_class=_DownloadProgress)
     finally:
         _DownloadProgress._reset()
+

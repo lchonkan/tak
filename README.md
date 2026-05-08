@@ -253,20 +253,20 @@ graph TD
         EP --> |macOS| MACOS[platforms.macos]
     end
 
-    subgraph "tak/app.py (Shared Core)"
+    subgraph "tak/core/app.py (Shared Core)"
         APP[TakApp]
         BASE_REC[BaseAudioRecorder]
         BASE_TR[BaseTranscriber]
         PARSE[parse_args]
     end
 
-    subgraph "tak/platforms/linux.py"
+    subgraph "tak/backend/linux.py"
         LREC[LinuxAudioRecorder<br/>PipeWire / ALSA]
         LTR[LinuxTranscriber<br/>faster-whisper + CUDA]
         LTI[type_text<br/>xdotool / xclip]
     end
 
-    subgraph "tak/platforms/macos.py"
+    subgraph "tak/backend/macos.py"
         MREC[MacAudioRecorder<br/>Core Audio]
         MTR[MacTranscriber<br/>mlx-whisper + Metal]
         MTI[type_text<br/>AppleScript / pbcopy]
@@ -311,18 +311,21 @@ tak/                                # Project root
 ├── tak/                            # Python package
 │   ├── __init__.py                 # Package marker
 │   ├── __main__.py                 # CLI entry point (platform detection, backend wiring)
-│   ├── gui_main.py                 # GUI entry point for macOS .app bundle
-│   ├── app.py                      # Shared core (TakApp, base classes, CLI, constants)
-│   ├── config.py                   # TakConfig dataclass (platform-agnostic settings)
-│   ├── platforms/
+│   ├── core/
+│   │   ├── app.py                  # Shared core (TakApp, base classes, CLI, constants)
+│   │   ├── config.py               # TakConfig dataclass (platform-agnostic settings)
+│   │   └── models.py               # Shared model metadata (MLX repo IDs)
+│   ├── backend/
 │   │   ├── linux.py                # Linux backend (faster-whisper, PipeWire/ALSA, xdotool)
 │   │   └── macos.py                # macOS backend (mlx-whisper, Core Audio, AppleScript)
 │   └── ui/
-│       ├── design.py               # Shared design system (colors, fonts, card views)
-│       ├── overlay_macos.py        # Floating recording/transcribing pill overlay
-│       ├── menubar_macos.py        # macOS menu bar status item and dropdown
-│       ├── settings_macos.py       # Preferences window (NSUserDefaults persistence)
-│       └── splash_macos.py         # Model download splash screen
+│       └── macos/
+│           ├── design.py           # macOS design system (colors, fonts, card views)
+│           ├── gui_main.py         # GUI entry point for macOS .app bundle
+│           ├── overlay.py          # Floating recording/transcribing pill overlay
+│           ├── menubar.py          # macOS menu bar status item and dropdown
+│           ├── settings.py         # Preferences window (NSUserDefaults persistence)
+│           └── splash.py           # Model download splash screen
 └── .gitignore
 ```
 

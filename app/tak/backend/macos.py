@@ -13,20 +13,11 @@ from typing import Optional
 import numpy as np
 import sounddevice as sd
 
-from tak.app import (
-    BaseAudioRecorder, BaseTranscriber,
-    WHISPER_RATE, CHANNELS, DTYPE, BLOCK_SIZE, KEY_MAP,
-    status, announce, warn, error, _resample, C,
-)
-
-
-# ─── MLX Hub model mapping ──────────────────────────────────────────────
-MLX_MODELS = {
-    "small":    "mlx-community/whisper-small-mlx",
-    "medium":   "mlx-community/whisper-medium-mlx-fp32",
-    "large-v3": "mlx-community/whisper-large-v3-mlx",
-    "turbo":    "mlx-community/whisper-large-v3-turbo",
-}
+from tak.core.audio import BaseAudioRecorder, BaseTranscriber, _resample
+from tak.core.console import C, announce, error, status, warn
+from tak.core.constants import BLOCK_SIZE, CHANNELS, DTYPE, WHISPER_RATE
+from tak.core.keymap import KEY_MAP
+from tak.core.models import MLX_MODELS
 
 
 # ─── accessibility permission check ─────────────────────────────────────
@@ -78,9 +69,13 @@ def type_text(text: str) -> bool:
             f'    keystroke "{escaped}"\n'
             'end tell'
         )
+        env = os.environ.copy()
+        env["LANG"] = "en_US.UTF-8"
         subprocess.run(
-            ["osascript", "-e", script],
+            ["osascript"],
+            input=script.encode("utf-8"),
             check=True, timeout=30, capture_output=True,
+            env=env,
         )
         return True
     except FileNotFoundError:
@@ -106,8 +101,10 @@ def type_text_clipboard(text: str) -> bool:
             capture_output=True, timeout=2,
         ).stdout
 
-        # Set new clipboard content
-        proc = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
+        # Set new clipboard content (ensure UTF-8 locale for non-ASCII text)
+        env = os.environ.copy()
+        env["LANG"] = "en_US.UTF-8"
+        proc = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE, env=env)
         proc.communicate(text.encode("utf-8"))
 
         # Paste with Cmd+V via CGEvents (uses Accessibility permission,
@@ -290,3 +287,4 @@ def get_default_model():
 def get_platform_label():
     """Platform label for the banner."""
     return "macOS / Metal"
+

@@ -49,11 +49,12 @@ def main():
             os.environ["PATH"] = brew_path + ":" + os.environ.get("PATH", "")
 
     logging.info("Importing modules...")
-    from tak.platforms import macos as backend
-    from tak.ui.overlay_macos import MacOverlay, run_app_loop
-    from tak.ui.menubar_macos import MacMenuBar
-    from tak.ui.settings_macos import load_config
-    from tak.app import TakApp, KEY_MAP
+    from tak.backend import macos as backend
+    from tak.ui.macos.overlay import MacOverlay, run_app_loop
+    from tak.ui.macos.menubar import MacMenuBar
+    from tak.ui.macos.settings import load_config
+    from tak.core.app import TakApp
+    from tak.core.keymap import KEY_MAP
     logging.info("Imports done")
 
     # Load config from NSUserDefaults
@@ -93,7 +94,7 @@ def main():
     ns_app = AppKit.NSApplication.sharedApplication()
     ns_app.setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
 
-    from tak.ui.splash_macos import DownloadSplash, is_model_cached, download_model
+    from tak.ui.macos.splash import DownloadSplash, is_model_cached, download_model
 
     model_repo = backend.MLX_MODELS.get(config.model, config.model)
     splash = DownloadSplash()
