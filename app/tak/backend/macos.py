@@ -5,9 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import tempfile
 import time
-import wave
 from typing import Optional
 
 import numpy as np
@@ -44,17 +42,6 @@ def check_accessibility_permission() -> bool:
 def adjust_key_map():
     """Adjust key map for macOS."""
     pass
-
-
-# ─── WAV writer helper ──────────────────────────────────────────────────
-def _write_wav(path: str, audio: np.ndarray, rate: int):
-    """Write float32 audio to a 16-bit WAV using only the standard library."""
-    int16_audio = (audio * 32767).clip(-32768, 32767).astype(np.int16)
-    with wave.open(path, "w") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(rate)
-        wf.writeframes(int16_audio.tobytes())
 
 
 # ─── text injection via AppleScript ──────────────────────────────────────
@@ -152,21 +139,13 @@ class MacTranscriber(BaseTranscriber):
 
         status(f"Loading Whisper model '{model_size}' ({self._model_path})…", C.CYAN)
 
-        # Warm up: transcribe a silent clip to trigger model download + compilation
+        # Warm up with a numpy array so mlx-whisper never shells out to ffmpeg.
         warmup_audio = np.zeros(WHISPER_RATE, dtype=np.float32)  # 1 second of silence
-        warmup_path = os.path.join(tempfile.gettempdir(), "tak_warmup.wav")
-        _write_wav(warmup_path, warmup_audio, WHISPER_RATE)
-        try:
-            self._mlx_whisper.transcribe(
-                warmup_path,
-                path_or_hf_repo=self._model_path,
-                language="en",
-            )
-        finally:
-            try:
-                os.unlink(warmup_path)
-            except FileNotFoundError:
-                pass
+        self._mlx_whisper.transcribe(
+            warmup_audio,
+            path_or_hf_repo=self._model_path,
+            language="en",
+        )
 
         announce(f"Model '{model_size}' loaded and ready")
 
@@ -175,21 +154,11 @@ class MacTranscriber(BaseTranscriber):
         status("Transcribing…", C.YELLOW)
         t0 = time.time()
 
-        # Write temp WAV — mlx-whisper needs a file path
-        tmp_path = os.path.join(tempfile.gettempdir(), "tak_audio.wav")
-        _write_wav(tmp_path, audio, WHISPER_RATE)
-
-        try:
-            result = self._mlx_whisper.transcribe(
-                tmp_path,
-                path_or_hf_repo=self._model_path,
-                language=None,  # auto-detect (en/es)
-            )
-        finally:
-            try:
-                os.unlink(tmp_path)
-            except FileNotFoundError:
-                pass
+        result = self._mlx_whisper.transcribe(
+            audio,
+            path_or_hf_repo=self._model_path,
+            language=None,  # auto-detect (en/es)
+        )
 
         text = result.get("text", "").strip()
         elapsed = time.time() - t0
