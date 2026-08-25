@@ -42,12 +42,6 @@ def main():
     _setup_logging()
     logging.info("TAK starting")
 
-    # Ensure Homebrew bin dirs are in PATH — Finder-launched .app bundles
-    # only get /usr/bin:/bin:/usr/sbin:/sbin, missing ffmpeg and other tools.
-    for brew_path in ("/opt/homebrew/bin", "/usr/local/bin"):
-        if brew_path not in os.environ.get("PATH", ""):
-            os.environ["PATH"] = brew_path + ":" + os.environ.get("PATH", "")
-
     logging.info("Importing modules...")
     from tak.backend import macos as backend
     from tak.ui.macos.overlay import MacOverlay, run_app_loop
